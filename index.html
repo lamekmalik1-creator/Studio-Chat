@@ -4,22 +4,22 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#111827">
-  <meta name="description" content="A simple launcher for Perchance character creation, character chat and image generation.">
+  <meta name="description" content="Create original characters and roleplay with them using free community-powered AI.">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
   <link rel="stylesheet" href="./styles.css">
-  <title>Studio Chat — Perchance tools</title>
+  <title>Studio Chat — Character roleplay studio</title>
 </head>
 <body>
   <header class="topbar">
-    <div class="brand"><div class="brand-mark">S</div><div><strong>Studio Chat</strong><small>Character creator · Chat · Images</small></div></div>
+    <div class="brand"><div class="brand-mark">S</div><div><strong>Studio Chat</strong><small>Character creator · Roleplay · Images</small></div></div>
     <button id="installBtn" class="install-btn" hidden>Install app</button>
   </header>
   <main>
     <section class="intro">
       <p class="eyebrow">YOUR CREATIVE WORKSPACE</p>
       <h1>Bring your characters to life.</h1>
-      <p class="intro-copy">Choose a Perchance tool below. Each tool opens on its own official Perchance page so its full interface can work without being blocked inside Studio Chat.</p>
+      <p class="intro-copy">Create original characters, then chat with them in an ongoing roleplay. Studio Chat uses AI Horde's free, community-powered text-generation API. Responses may take time when volunteer workers are busy.</p>
     </section>
     <nav class="tabs" aria-label="Main tools">
       <button class="tab active" data-panel="character">✦ <span>Character</span></button>
@@ -27,37 +27,47 @@
       <button class="tab" data-panel="image">▧ <span>Image studio</span></button>
     </nav>
     <section id="character" class="panel active">
-      <div class="panel-heading"><div><p class="eyebrow">01 / DESIGN</p><h2>Character generator</h2></div></div>
-      <p class="hint">Create a character using Perchance's character generator.</p>
-      <div class="launch-card">
-        <div class="launch-icon">✦</div>
-        <h3>Perchance AI Character Generator</h3>
-        <p>Open the original generator in a new tab. Your browser will load Perchance directly.</p>
-        <a class="launch-btn" href="https://perchance.org/ai-character-generator" target="_blank" rel="noopener">Open character generator ↗</a>
-      </div>
+      <div class="panel-heading"><div><p class="eyebrow">01 / DESIGN</p><h2>Character creator</h2></div></div>
+      <p class="hint">Build a character profile. Characters in roleplay must be adults (18+). Your profile is saved only in this browser.</p>
+      <form id="characterForm" class="image-form">
+        <div class="form-grid">
+          <div><label for="charName">Character name</label><input id="charName" maxlength="60" placeholder="e.g. Amara" required></div>
+          <div><label for="charAge">Age (18 or older)</label><input id="charAge" type="number" min="18" max="999" value="28" required></div>
+        </div>
+        <label for="charAppearance">Appearance</label><textarea id="charAppearance" rows="2" placeholder="Appearance, clothing, distinctive features..."></textarea>
+        <label for="charPersonality">Personality</label><textarea id="charPersonality" rows="3" placeholder="How does your character think, speak and behave?"></textarea>
+        <label for="charBackground">Background and setting</label><textarea id="charBackground" rows="3" placeholder="History, world, relationships, secrets..."></textarea>
+        <label for="charScenario">Opening scenario</label><textarea id="charScenario" rows="3" placeholder="Where does the roleplay begin? What is happening?"></textarea>
+        <div class="form-grid">
+          <div><label for="roleplayStyle">Roleplay style</label><select id="roleplayStyle"><option value="Cinematic, descriptive prose with dialogue">Cinematic and descriptive</option><option value="Natural conversational roleplay">Natural conversation</option><option value="Dark, tense horror with suspense">Dark horror and suspense</option><option value="Romantic, emotionally detailed roleplay">Romantic and emotional</option></select></div>
+          <div><label for="contentMode">Content preference</label><select id="contentMode"><option value="Mature themes, horror and violence are allowed; keep sexual content non-explicit.">Mature / horror</option><option value="Adult fictional roleplay may include explicit consensual sexual themes between clearly adult characters. All characters are adults and consent is respected.">Adult roleplay (adults only)</option><option value="Mature horror and adult consensual fictional roleplay are both allowed. All characters are adults and consent is respected.">Mature horror + adult roleplay</option></select></div>
+        </div>
+        <button class="primary" type="submit">Save character and open chat</button>
+        <p id="characterStatus" class="status" aria-live="polite"></p>
+      </form>
     </section>
     <section id="chat" class="panel">
-      <div class="panel-heading"><div><p class="eyebrow">02 / ROLEPLAY</p><h2>Character chat</h2></div></div>
-      <p class="hint">Start a conversation with a character using Perchance's own chat interface.</p>
-      <div class="launch-card">
-        <div class="launch-icon">☏</div>
-        <h3>Perchance AI Character Chat</h3>
-        <p>Chat opens directly on Perchance instead of inside an embedded frame. This avoids common browser restrictions that can stop sign-in, storage or chat controls from working in an iframe.</p>
-        <a class="launch-btn" href="https://perchance.org/ai-character-chat" target="_blank" rel="noopener">Open character chat ↗</a>
-      </div>
+      <div class="panel-heading"><div><p class="eyebrow">02 / ROLEPLAY</p><h2>Character chat</h2></div><button id="clearChat" class="text-button" type="button">Clear conversation</button></div>
+      <div id="activeCharacter" class="character-summary">No character selected yet. Create one in the Character tab first.</div>
+      <div id="chatLog" class="chat-log" aria-live="polite"><div class="empty-chat">Your roleplay will appear here. Create a character, then send the first message.</div></div>
+      <form id="chatForm" class="chat-composer">
+        <textarea id="userMessage" rows="3" maxlength="3000" placeholder="Write your message or action..." required></textarea>
+        <div class="composer-bottom"><span id="chatStatus" class="status" aria-live="polite">Free community workers may take a little while to respond.</span><button id="sendBtn" class="primary" type="submit">Send message</button></div>
+      </form>
+      <p class="privacy-note">AI Horde is community-powered. Treat prompts as potentially visible to volunteer workers; do not include passwords, private information or anything you would not share publicly. Conversation history is stored in this browser only.</p>
     </section>
     <section id="image" class="panel">
       <div class="panel-heading"><div><p class="eyebrow">03 / CREATE</p><h2>Image studio</h2></div></div>
-      <p class="hint">Generate images directly with Perchance's official text-to-image generator.</p>
+      <p class="hint">The Perchance image generator remains available as a separate tool. Its page cannot currently be embedded inside Studio Chat.</p>
       <div class="launch-card">
         <div class="launch-icon">▧</div>
         <h3>Perchance AI Image Generator</h3>
-        <p>The previous custom image request used an unofficial message/API contract that may not be supported. This button opens the real Perchance image generator directly, with its own prompt box and generation controls.</p>
+        <p>Open the official image generator directly in a new tab.</p>
         <a class="launch-btn" href="https://perchance.org/ai-text-to-image-generator" target="_blank" rel="noopener">Open image generator ↗</a>
       </div>
     </section>
     <footer>
-      <p>Studio Chat is an independent launcher and is not affiliated with Perchance. The AI tools run on Perchance and require an internet connection.</p>
+      <p>Studio Chat is an independent project. Text generation is provided by AI Horde and volunteer workers; image generation opens Perchance separately.</p>
       <button id="helpInstall" class="text-button">How to install this app</button>
     </footer>
   </main>
@@ -65,7 +75,7 @@
     <div class="dialog-head"><h2>Install Studio Chat</h2><button id="closeHelp" aria-label="Close">×</button></div>
     <p><strong>Android (Chrome):</strong> open this site, tap the browser menu ⋮, then choose <em>Install app</em> or <em>Add to Home screen</em>.</p>
     <p><strong>Desktop:</strong> use the install icon in the address bar, or the Install app button when it appears.</p>
-    <p>Studio Chat can cache its own app shell. Perchance tools still require internet access.</p>
+    <p>Studio Chat needs an internet connection for AI replies.</p>
     <button id="okHelp" class="primary">Got it</button>
   </dialog>
   <script src="./app.js" defer></script>
