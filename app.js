@@ -135,23 +135,27 @@ function buildPrompt() {
 function cleanCharacterReply(raw) {
   let answer = String(raw || "").trim();
 
-  // Remove model reasoning blocks and their visible boundary tokens.
+  // Reasoning models may put private thoughts before </think> and the reply after it.
+  const thinkClose = answer.toLowerCase().lastIndexOf("</think>");
+  if (thinkClose >= 0) answer = answer.slice(thinkClose + 8).trim();
+  else if (/<think>/i.test(answer)) answer = answer.replace(/<think>[\s\S]*$/i, "");
+
   answer = answer.replace(/<think>[\s\S]*?<\/think>/gi, "");
-  answer = answer.replace(/<think>[\s\S]*$/gi, "");
   answer = answer.replace(/<\/?think>/gi, "");
   answer = answer.replace(/<\|(?:im_start|im_end|endoftext|assistant|analysis|final)\|>/gi, "");
 
-  // Remove prompt/instruction or analysis headers if a model echoes them.
-  answer = answer.replace(/^\s*(?:#{1,6}\s*)?(?:instruction|system prompt|analysis|reasoning|thought process|response|assistant)\s*:?\s*/i, "");
-  answer = answer.replace(/^\s*(?:#{1,6}\s*)?(?:roleplay so far|conversation history)\s*:?\s*/i, "");
+  const escapedName = character.name.replace(/[.*+?^|()[\]\\]/g, "\\$&");
+  const nameHeading = new RegExp("(?:^|\\n)\\s*(?:#{1,6}\\s*)?" + escapedName + "\\s*:\\s*", "i");
+  const headingMatch = answer.match(nameHeading);
+  if (headingMatch && headingMatch.index !== undefined) {
+    answer = answer.slice(headingMatch.index + headingMatch[0].length);
+  } else {
+    answer = answer.replace(/^\s*(?:#{1,6}\s*)?(?:instruction|system prompt|analysis|reasoning|thought process|response|assistant|roleplay so far|conversation history)\s*:?\s*/i, "");
+  }
 
-  // Remove a simple speaker heading if the model adds one.
-  answer = answer.replace(/^\s*(?:#{1,6}\s*)?[A-Za-z][A-Za-z0-9 _-]{0,30}:\s*/, "");
-
-  // If the model starts writing the user's next turn, discard that part.
+  answer = answer.replace(new RegExp("^\\s*(?:#{1,6}\\s*)?" + escapedName + "\\s*:\\s*", "i"), "");
+  answer = answer.replace(/^\s*(?:#{1,6}\s*)?assistant\s*:\s*/i, "");
   answer = answer.replace(/\n\s*(?:#{1,6}\s*)?(?:user|you|human)\s*:[\s\S]*$/i, "");
-
-  // Strip stray formatting tokens without disturbing normal roleplay prose.
   answer = answer.replace(/<\/?(?:s|speak|response)>/gi, "");
   return answer.trim();
 }
