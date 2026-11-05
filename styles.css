@@ -34,3 +34,21 @@ dialog{background:#172238;color:var(--text);border:1px solid var(--line);border-
 .launch-card p{font-size:13px;line-height:1.65;color:var(--muted);max-width:500px;margin:0 auto 20px}
 .launch-btn{display:inline-flex;align-items:center;justify-content:center;padding:13px 20px;border-radius:11px;background:linear-gradient(100deg,#8b5cf6,#4f8df7);color:white;text-decoration:none;font-weight:800;font-size:13px}
 .launch-btn:hover{filter:brightness(1.1)}
+
+.character-summary{display:flex;flex-direction:column;gap:5px;padding:14px 16px;margin:16px 0;background:#0c1425;border:1px solid var(--line);border-radius:12px}
+.character-summary strong{font-size:14px}.character-summary span{font-size:12px;color:var(--muted);line-height:1.5}
+.chat-log{height: min(52vh,620px);min-height:300px;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:16px;background:#0a1020;border:1px solid var(--line);border-radius:13px}
+.empty-chat{margin:auto;text-align:center;color:var(--muted);font-size:13px;max-width:320px;line-height:1.6}
+.chat-message{max-width:88%;padding:12px 14px;border-radius:13px;line-height:1.6;overflow-wrap:anywhere}
+.chat-message strong{display:block;font-size:11px;color:var(--accent2);margin-bottom:5px}
+.chat-message p{font-size:13px;white-space:pre-wrap;margin:0}
+.from-user{align-self:flex-end;background:#28365a;border:1px solid #435782}
+.from-character{align-self:flex-start;background:#17243a;border:1px solid #34435c}
+.chat-composer{margin-top:12px;padding:13px;background:#101a2c;border:1px solid var(--line);border-radius:13px}
+.chat-composer textarea{min-height:76px}
+.composer-bottom{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px}
+.composer-bottom .status{flex:1;margin:0;line-height:1.5}
+.composer-bottom .primary{white-space:nowrap}
+.primary:disabled{opacity:.55;cursor:wait}
+.privacy-note{font-size:11px;line-height:1.6;color:#8f9bb0;margin:12px 2px 0}
+@media(max-width:640px){.chat-log{height:55vh;min-height:280px;padding:10px}.chat-message{max-width:96%}.composer-bottom{align-items:stretch;flex-direction:column}.composer-bottom .primary{width:100%}}
