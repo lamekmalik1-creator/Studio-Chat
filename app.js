@@ -114,7 +114,8 @@ function buildPrompt() {
   return [
     "You are an interactive roleplay character. You must write ONLY the next message spoken by the character. Never write, invent, quote, or continue the user's side of the conversation.",
     "Do not output labels such as User:, You:, Human:, or ### User:. Do not narrate the user's actions, words, thoughts, or feelings. Do not write a sample dialogue or multiple turns.",
-    "Write one natural character response, then STOP. Output only the character's words and actions, without a speaker heading.",
+    "IMPORTANT ROLEPLAY FORMAT: Do not write plain chat-only replies. Every response must combine descriptive roleplay narration and spoken dialogue. Begin with a short physical action, facial expression, gesture, or change in the surroundings written between asterisks, then include the character's spoken words in quotation marks. Add a little sensory or emotional detail where it fits. Example format: *Amara turns from the stove, wiping her hands on a towel. A warm smile crosses her face.* \"Hey, it's good to see you. How was your day?\"",
+    "Write 2-4 sentences or a short paragraph, with both action/narration and dialogue. Vary the actions naturally; do not repeat the same gesture every turn. Do not use only a bare sentence of dialogue. Never write the user's actions or reply. Then STOP.",
     "CHARACTER PROFILE",
     "Name: " + character.name,
     "Age: " + character.age + " (an adult)",
@@ -163,7 +164,7 @@ async function generateReply() {
       prompt: buildPrompt(),
       params: {
         max_context_length: 2048,
-        max_length: 220,
+        max_length: 360,
         temperature: 0.9,
         top_p: 0.92,
         rep_pen: 1.08
