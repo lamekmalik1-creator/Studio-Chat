@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
+  <meta name="description" content="A Perchance-powered character creator, character chat and standalone image generator.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon-192.png">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="stylesheet" href="./styles.css">
+  <title>Perchance Studio</title>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">P</div>
+      <div><strong>Perchance Studio</strong><small>Character creator · Chat · Images</small></div>
+    </div>
+    <button id="installBtn" class="install-btn" hidden>Install app</button>
+  </header>
+
+  <main>
+    <section class="intro">
+      <p class="eyebrow">YOUR CREATIVE WORKSPACE</p>
+      <h1>Bring your characters to life.</h1>
+      <p class="intro-copy">Create a character, start a conversation, or generate an image. Perchance does the AI work; this app brings the tools together.</p>
+    </section>
+
+    <nav class="tabs" aria-label="Main tools">
+      <button class="tab active" data-panel="character">✦ <span>Character</span></button>
+      <button class="tab" data-panel="chat">☏ <span>Chat</span></button>
+      <button class="tab" data-panel="image">▧ <span>Image studio</span></button>
+    </nav>
+
+    <section id="character" class="panel active">
+      <div class="panel-heading">
+        <div><p class="eyebrow">01 / DESIGN</p><h2>Character generator</h2></div>
+        <a class="external" href="https://perchance.org/ai-character-generator" target="_blank" rel="noopener">Open directly ↗</a>
+      </div>
+      <p class="hint">Use Perchance's character generator to create a visual character portrait. For a written personality, greeting and backstory, continue in Character Chat.</p>
+      <div class="frame-wrap">
+        <iframe title="Perchance character generator" src="https://perchance.org/ai-character-generator" loading="lazy" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+      </div>
+      <p class="fallback">If the generator does not appear inside the app, use <a href="https://perchance.org/ai-character-generator" target="_blank" rel="noopener">Open character generator in browser</a>.</p>
+    </section>
+
+    <section id="chat" class="panel">
+      <div class="panel-heading">
+        <div><p class="eyebrow">02 / ROLEPLAY</p><h2>Character chat</h2></div>
+        <a class="external" href="https://perchance.org/ai-character-chat" target="_blank" rel="noopener">Open directly ↗</a>
+      </div>
+      <p class="hint">Create or select a character, set up their personality and scenario, then chat with them using Perchance's own chat interface.</p>
+      <div class="frame-wrap chat-frame">
+        <iframe title="Perchance AI character chat" src="https://perchance.org/ai-character-chat" loading="lazy" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+      </div>
+      <p class="fallback">If chat is blocked in the embedded view, <a href="https://perchance.org/ai-character-chat" target="_blank" rel="noopener">open Perchance Character Chat</a>. Chat history and character data may be stored by Perchance in that browser's own storage.</p>
+    </section>
+
+    <section id="image" class="panel">
+      <div class="panel-heading">
+        <div><p class="eyebrow">03 / CREATE</p><h2>Standalone image generator</h2></div>
+        <a class="external" href="https://perchance.org/ai-text-to-image-generator" target="_blank" rel="noopener">Open directly ↗</a>
+      </div>
+      <p class="hint">Generate images independently of the character chat. Describe the subject, choose a canvas size and send the prompt to Perchance.</p>
+      <div class="image-form">
+        <label for="prompt">Image prompt</label>
+        <textarea id="prompt" maxlength="6000" placeholder="A cinematic portrait of a travelling botanist in a rain-soaked greenhouse, soft window light, highly detailed..."></textarea>
+        <div class="form-grid">
+          <div><label for="resolution">Image size</label>
+            <select id="resolution">
+              <option value="512x512">Square · 512 × 512</option>
+              <option value="768x768" selected>Square · 768 × 768</option>
+              <option value="512x768">Portrait · 512 × 768</option>
+              <option value="768x512">Landscape · 768 × 512</option>
+            </select>
+          </div>
+          <div><label for="seed">Seed (optional)</label><input id="seed" type="number" inputmode="numeric" placeholder="Random"></div>
+        </div>
+        <button id="generateBtn" class="primary">Generate image <span>→</span></button>
+        <p id="imageStatus" class="status" role="status" aria-live="polite">Ready when you are.</p>
+        <div id="imageOutput" class="image-output" hidden>
+          <img id="generatedImage" alt="Generated image">
+          <div class="output-actions">
+            <a id="openImage" target="_blank" rel="noopener">Open image ↗</a>
+            <a id="downloadImage" download="perchance-image.png">Save image ↓</a>
+          </div>
+        </div>
+      </div>
+      <p class="fallback">This uses Perchance's iframe + postMessage image interface. If it is unavailable, use the <a href="https://perchance.org/ai-text-to-image-generator" target="_blank" rel="noopener">standalone Perchance image generator</a>.</p>
+    </section>
+
+    <footer>
+      <p>Perchance Studio is an independent frontend and is not affiliated with Perchance. AI tools require an internet connection and remain subject to Perchance availability and usage rules.</p>
+      <button id="helpInstall" class="text-button">How to install this app</button>
+    </footer>
+  </main>
+
+  <dialog id="installHelp">
+    <div class="dialog-head"><h2>Install Perchance Studio</h2><button id="closeHelp" aria-label="Close">×</button></div>
+    <p><strong>Android (Chrome):</strong> open this site from its GitHub Pages URL, tap the browser menu ⋮, then choose <em>Install app</em> or <em>Add to Home screen</em>.</p>
+    <p><strong>Desktop (Chrome/Edge):</strong> use the install icon in the address bar, or the Install app button when it appears.</p>
+    <p>The app shell can open offline after its first visit. Perchance's generators still need internet access.</p>
+    <button id="okHelp" class="primary">Got it</button>
+  </dialog>
+
+  <script src="./app.js" defer></script>
+</body>
+</html>
