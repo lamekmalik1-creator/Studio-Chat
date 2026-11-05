@@ -27,3 +27,10 @@ textarea:focus,input:focus,select:focus{border-color:var(--accent)}textarea{min-
 footer{border-top:1px solid var(--line);margin-top:22px;padding:17px 2px;display:flex;align-items:center;justify-content:space-between;gap:20px}footer p{font-size:11px;color:#8491a8;line-height:1.5;max-width:720px;margin:0}.text-button{border:0;background:transparent;color:#c4b5fd;font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer}
 dialog{background:#172238;color:var(--text);border:1px solid var(--line);border-radius:16px;max-width:440px;width:calc(100% - 32px);padding:20px;box-shadow:0 25px 80px #0009}dialog::backdrop{background:#030712bb;backdrop-filter:blur(3px)}.dialog-head{display:flex;align-items:center;justify-content:space-between}.dialog-head h2{font-size:20px;margin:0}.dialog-head button{background:transparent;border:0;color:white;font-size:25px}.dialog-head+p,dialog p{font-size:13px;color:var(--muted);line-height:1.6}
 @media(max-width:640px){main{padding:24px 12px}.topbar{padding:0 14px}.tabs{width:100%;display:grid;grid-template-columns:repeat(3,1fr);gap:4px}.tab{padding:10px 4px;font-size:12px}.panel{padding:14px;border-radius:14px}.panel-heading h2{font-size:20px}.external{font-size:11px}.frame-wrap{height:68vh;min-height:480px}.chat-frame{height:72vh}.form-grid{grid-template-columns:1fr}footer{align-items:flex-start;flex-direction:column}}
+
+.launch-card{max-width:680px;margin:22px auto 8px;padding:30px 24px;text-align:center;background:linear-gradient(145deg,#18243a,#101829);border:1px solid #34415a;border-radius:18px}
+.launch-icon{width:58px;height:58px;margin:0 auto 16px;border-radius:17px;display:grid;place-items:center;font-size:28px;color:#fff;background:linear-gradient(135deg,#8b5cf6,#22d3ee)}
+.launch-card h3{font-size:20px;margin:0 0 9px}
+.launch-card p{font-size:13px;line-height:1.65;color:var(--muted);max-width:500px;margin:0 auto 20px}
+.launch-btn{display:inline-flex;align-items:center;justify-content:center;padding:13px 20px;border-radius:11px;background:linear-gradient(100deg,#8b5cf6,#4f8df7);color:white;text-decoration:none;font-weight:800;font-size:13px}
+.launch-btn:hover{filter:brightness(1.1)}
