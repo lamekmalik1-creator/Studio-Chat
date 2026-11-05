@@ -52,3 +52,13 @@ dialog{background:#172238;color:var(--text);border:1px solid var(--line);border-
 .primary:disabled{opacity:.55;cursor:wait}
 .privacy-note{font-size:11px;line-height:1.6;color:#8f9bb0;margin:12px 2px 0}
 @media(max-width:640px){.chat-log{height:55vh;min-height:280px;padding:10px}.chat-message{max-width:96%}.composer-bottom{align-items:stretch;flex-direction:column}.composer-bottom .primary{width:100%}}
+
+.connection-card{padding:14px 16px;margin:16px 0;background:#0c1425;border:1px solid var(--line);border-radius:12px}
+.connection-row{display:flex;gap:9px}
+.connection-row input{min-width:0;flex:1}
+.secondary-btn{border:1px solid #6654a7;background:#292448;color:#e9ddff;border-radius:9px;padding:0 16px;font-size:12px;font-weight:800;white-space:nowrap;cursor:pointer}
+.model-row{display:flex;align-items:center;gap:14px;margin-top:12px}
+.model-row label{margin:0;white-space:nowrap}
+.model-row select{max-width:100%;flex:1}
+.connection-card .status{line-height:1.5;margin-bottom:0}
+@media(max-width:640px){.connection-row{flex-direction:column}.secondary-btn{padding:12px}.model-row{align-items:stretch;flex-direction:column;gap:7px}}
