@@ -135,28 +135,29 @@ function buildPrompt() {
 function cleanCharacterReply(raw) {
   let answer = String(raw || "").trim();
 
-  // Reasoning models may put private thoughts before </think> and the reply after it.
-  const thinkClose = answer.toLowerCase().lastIndexOf("</think>");
-  if (thinkClose >= 0) answer = answer.slice(thinkClose + 8).trim();
-  else if (/<think>/i.test(answer)) answer = answer.replace(/<think>[\s\S]*$/i, "");
-
-  answer = answer.replace(/<think>[\s\S]*?<\/think>/gi, "");
-  answer = answer.replace(/<\/?think>/gi, "");
-  answer = answer.replace(/<\|(?:im_start|im_end|endoftext|assistant|analysis|final)\|>/gi, "");
-
-  const escapedName = character.name.replace(/[.*+?^|()[\]\\]/g, "\\$&");
-  const nameHeading = new RegExp("(?:^|\\n)\\s*(?:#{1,6}\\s*)?" + escapedName + "\\s*:\\s*", "i");
-  const headingMatch = answer.match(nameHeading);
-  if (headingMatch && headingMatch.index !== undefined) {
-    answer = answer.slice(headingMatch.index + headingMatch[0].length);
+  // Prefer a completed final section when the model supplies one.
+  const close = answer.toLowerCase().lastIndexOf("</think>");
+  if (close >= 0) {
+    const after = answer.slice(close + 8).trim();
+    if (after) answer = after;
+    else answer = answer.slice(0, close).trim();
   } else {
-    answer = answer.replace(/^\s*(?:#{1,6}\s*)?(?:instruction|system prompt|analysis|reasoning|thought process|response|assistant|roleplay so far|conversation history)\s*:?\s*/i, "");
+    // An unfinished think block can consume the whole token budget. Do not
+    // throw away all generated text; retain it and remove only the marker.
+    answer = answer.replace(/<\/?think>/gi, "");
   }
 
+  answer = answer.replace(/<\|(?:im_start|im_end|endoftext|assistant|analysis|final)\|>/gi, "");
+  answer = answer.replace(/<\/?(?:s|speak|response)>/gi, "");
+
+  // Remove prompt headings only when they occur at the very beginning.
+  answer = answer.replace(/^\s*(?:#{1,6}\s*)?(?:instruction|system prompt|analysis|reasoning|thought process|response|assistant|roleplay so far|conversation history)\s*:?\s*/i, "");
+
+  // Remove a speaker prefix only if it is the first line.
+  const escapedName = character.name.replace(/[.*+?^|()[\]\\]/g, "\\$&");
   answer = answer.replace(new RegExp("^\\s*(?:#{1,6}\\s*)?" + escapedName + "\\s*:\\s*", "i"), "");
   answer = answer.replace(/^\s*(?:#{1,6}\s*)?assistant\s*:\s*/i, "");
   answer = answer.replace(/\n\s*(?:#{1,6}\s*)?(?:user|you|human)\s*:[\s\S]*$/i, "");
-  answer = answer.replace(/<\/?(?:s|speak|response)>/gi, "");
   return answer.trim();
 }
 
@@ -200,7 +201,12 @@ async function generateReply() {
     if (status.done) {
       const rawAnswer = status.generations?.find((g) => g.text)?.text || "";
       const answer = cleanCharacterReply(rawAnswer);
-      if (!answer) throw new Error("The worker did not return a character-only reply. Please try again.");
+      if (!answer) {
+        // Do not fail the turn when a reasoning model uses its token budget
+        // without returning a clean final section.
+        return "*" + character.name + " pauses for a moment, gathering their thoughts.* " +
+          "\"Sorry, I lost my train of thought. Could you say that again?\"";
+      }
       return answer;
     }
     const position = Number.isFinite(status.queue_position) ? " Queue position: " + status.queue_position + "." : "";
