@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Studio Chat — Perchance Embed Test</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#10131b;color:#f3f4f8}
+*{box-sizing:border-box}body{margin:0;padding:22px;max-width:1100px;margin-inline:auto}
+h1{margin:0 0 8px;font-size:1.6rem}p{color:#b9c0d0;line-height:1.5}
+.note{padding:12px 14px;border:1px solid #41495b;border-radius:12px;background:#191f2c;margin:16px 0}
+.grid{display:grid;grid-template-columns:1fr;gap:20px}
+section{border:1px solid #343c4d;border-radius:14px;overflow:hidden;background:#171c27}
+header{padding:14px 16px;border-bottom:1px solid #343c4d}
+header h2{margin:0 0 4px;font-size:1.1rem}header p{margin:0;font-size:.9rem}
+iframe{display:block;width:100%;height:680px;border:0;background:white}
+.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px}
+a{color:#a9c7ff}
+a.button{display:inline-block;padding:9px 13px;border-radius:9px;background:#304c83;color:white;text-decoration:none}
+.small{font-size:.85rem}
+@media(min-width:850px){.grid{grid-template-columns:1fr 1fr}iframe{height:720px}}
+</style>
+</head>
+<body>
+<h1>Studio Chat — Perchance embed test</h1>
+<p>This is a separate diagnostic page. It does not change the normal Studio Chat tabs.</p>
+<div class="note">
+<strong>How to test:</strong> Wait 10–20 seconds for each panel. If the Perchance tool itself appears and you can use its controls inside the panel, embedding works. If you see a browser error, blank panel, or “refused to connect”, embedding is blocked for that page. The links below open the same tools directly for comparison.
+</div>
+<div class="grid">
+<section>
+<header><h2>Character Chat</h2><p>Testing the official Perchance chat page inside an iframe.</p><div class="actions"><a class="button" href="https://perchance.org/ai-character-chat" target="_blank" rel="noopener">Open chat directly</a></div></header>
+<iframe title="Perchance AI Character Chat embed test" src="https://perchance.org/ai-character-chat" loading="eager" referrerpolicy="strict-origin-when-cross-origin" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+</section>
+<section>
+<header><h2>Image Generator</h2><p>Testing the official Perchance image page inside an iframe.</p><div class="actions"><a class="button" href="https://perchance.org/ai-text-to-image-generator" target="_blank" rel="noopener">Open image generator directly</a></div></header>
+<iframe title="Perchance AI Image Generator embed test" src="https://perchance.org/ai-text-to-image-generator" loading="eager" referrerpolicy="strict-origin-when-cross-origin" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+</section>
+</div>
+<p class="small">Note: Perchance pages can contain their own nested frames. A page may partially load while an inner tool is blocked, so please check whether the actual chat or image-generation controls work—not just whether the Perchance header appears.</p>
+<p><a href="./">← Back to Studio Chat</a></p>
+</body>
+</html>
