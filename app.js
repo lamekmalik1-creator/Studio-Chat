@@ -109,6 +109,33 @@ $("characterForm").addEventListener("submit", (event) => {
 
 function buildPrompt() {
   const recent = messages.slice(-12).map((m) =>
+    (m.role === "user" ? "[USER MESSAGE]" : "[CHARACTER REPLY]") + "\n" + m.content
+  ).join("\n\n");
+  return [
+    "You are an interactive roleplay character. You must write ONLY the next message spoken by the character. Never write, invent, quote, or continue the user's side of the conversation.",
+    "Do not output labels such as User:, You:, Human:, or ### User:. Do not narrate the user's actions, words, thoughts, or feelings. Do not write a sample dialogue or multiple turns.",
+    "Write one natural character response, then STOP. Output only the character's words and actions, without a speaker heading.",
+    "CHARACTER PROFILE",
+    "Name: " + character.name,
+    "Age: " + character.age + " (an adult)",
+    "Appearance: " + (character.appearance || "Not specified"),
+    "Personality: " + (character.personality || "Develop a consistent personality from the scenario"),
+    "Background: " + (character.background || "Not specified"),
+    "Current scenario: " + (character.scenario || "Begin a natural conversation with the user"),
+    "Writing style: " + character.style,
+    "Content guidance: " + character.content,
+    "Rules: All characters involved in adult situations are adults aged 18 or older. Respect consent. Never decide the user's actions or thoughts. Do not break character unless asked. Fictional horror and zombie themes are welcome.",
+    "CONVERSATION HISTORY (use only for context; do not repeat or continue either side):",
+    recent || "No messages yet.",
+    "NOW WRITE ONLY " + character.name + "'S NEXT REPLY. Do not write the user's reply."
+  ].join("\n\n");
+}
+
+function cleanCharacterReply(raw) {
+  let answer = String(raw || "").trim();
+  // Remove a leading character-name heading if the model adds one.
+  answer = answer.replace(new RegExp("^\\s*(?:#{1,6}\\s*)?" + character.name.replace(/[.*+?^\\x24{}()|[\\]\\\\]/g, "\\\\function buildPrompt() {
+  const recent = messages.slice(-12).map((m) =>
     (m.role === "user" ? "User" : character.name) + ": " + m.content
   ).join("\n");
   return [
@@ -127,6 +154,10 @@ function buildPrompt() {
     recent || "No messages yet.",
     "### " + character.name + ":"
   ].join("\n");
+}") + "\\s*:\\s*", "i"), "");
+  // Some text models continue the scene by writing the user's next turn. Keep only the character's reply.
+  answer = answer.replace(/\\n\\s*(?:#{1,6}\\s*)?(?:user|you|human)\\s*:[\\s\\S]*$/i, "");
+  return answer.trim();
 }
 
 async function hordeRequest(path, options = {}) {
@@ -167,8 +198,9 @@ async function generateReply() {
     const status = await hordeRequest("/generate/text/status/" + encodeURIComponent(submitted.id));
     if (status.faulted) throw new Error("The volunteer worker could not complete this reply. Please try again.");
     if (status.done) {
-      const answer = status.generations?.find((g) => g.text)?.text?.trim();
-      if (!answer) throw new Error("A worker finished, but returned an empty reply. Please try again.");
+      const rawAnswer = status.generations?.find((g) => g.text)?.text || "";
+      const answer = cleanCharacterReply(rawAnswer);
+      if (!answer) throw new Error("The worker did not return a character-only reply. Please try again.");
       return answer;
     }
     const position = Number.isFinite(status.queue_position) ? " Queue position: " + status.queue_position + "." : "";
