@@ -147,7 +147,7 @@ async function handleHordeSubmit(request, env) {
   try { body = await readJson(request); }
   catch (error) { return json(request, env, errorMessage(error.message), 400); }
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
-  if (!prompt || prompt.length > 8000) return json(request, env, errorMessage("Provide an image prompt between 1 and 8000 characters."), 400);
+  if (!prompt || prompt.length > 950) return json(request, env, errorMessage("AI Horde prompts must be between 1 and 950 characters. Rebuild or shorten the prompt before generating."), 400);
   const model = typeof body.model === "string" ? body.model.trim() : "stable_diffusion";
   if (!model || model.length > 120) return json(request, env, errorMessage("Invalid image model."), 400);
   const width = Math.round(Number(body.width));
@@ -164,6 +164,7 @@ async function handleHordeSubmit(request, env) {
       models: [model],
       nsfw: false,
       censor_nsfw: true,
+      replacement_filter: true,
       trusted_workers: false,
       allow_downgrade: true,
       r2: true
@@ -171,8 +172,13 @@ async function handleHordeSubmit(request, env) {
   });
   const payload = await upstream.json().catch(() => ({}));
   if (!upstream.ok || !payload.id) {
-    const detail = payload.message || payload.error || ("HTTP " + upstream.status);
-    return json(request, env, errorMessage("AI Horde could not queue this image: " + String(detail).slice(0, 350), upstream.status === 429 ? 429 : 502), upstream.status === 429 ? 429 : 502);
+    const detail = String(payload.message || payload.error || ("HTTP " + upstream.status)).slice(0, 350);
+    const ipTimeout = /ip.{0,40}timeout|timeout.{0,40}ip|abuse prevention/i.test(detail);
+    const status = upstream.status === 429 || ipTimeout ? 429 : 502;
+    const message = ipTimeout
+      ? "AI Horde has temporarily placed the request IP in an abuse-prevention timeout. Stop retrying and wait before trying again; repeated blocked prompts can extend the timeout."
+      : "AI Horde could not queue this image: " + detail;
+    return json(request, env, errorMessage(message, status), status);
   }
   return json(request, env, { id: payload.id, kudos: payload.kudos || null, message: payload.message || "Request queued." }, 202);
 }

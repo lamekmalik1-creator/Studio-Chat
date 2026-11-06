@@ -100,3 +100,10 @@ The existing \`OPENROUTER_API_KEY\` secret is still required for character chat.
 - The registered AI Horde key is never sent to the browser.
 
 AI Horde is free to use within its service rules, Kudos system, and volunteer capacity. Registration improves default priority compared with anonymous requests, but it does not guarantee a fast result. Queue time depends on available compatible workers, model demand, image size, and Kudos. Prompts and generated images are processed by volunteer workers; worker operators may be able to view them. See https://aihorde.net/docs/image/learn/concepts_horde/ for details.
+
+
+### Story-aware AI Horde image prompts
+- Image prompts preserve permanent character appearance from the character profile (especially face, complexion, hairstyle, body shape, and proportions).
+- Current clothing, pose, expression, action, and surroundings are inferred from a compact summary of the three most recent chat messages; the newest message takes priority.
+- Generated prompts are kept to 950 characters to stay below AI Horde's 1,000-character abuse-filter threshold, and requests enable `replacement_filter: true`.
+- If AI Horde reports an IP abuse-prevention timeout, stop retrying and wait before trying again. Repeated blocked prompts can extend the timeout.
