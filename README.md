@@ -107,3 +107,14 @@ AI Horde is free to use within its service rules, Kudos system, and volunteer ca
 - Current clothing, pose, expression, action, and surroundings are inferred from a compact summary of the three most recent chat messages; the newest message takes priority.
 - Generated prompts are kept to 950 characters to stay below AI Horde's 1,000-character abuse-filter threshold, and requests enable `replacement_filter: true`.
 - If AI Horde reports an IP abuse-prevention timeout, stop retrying and wait before trying again. Repeated blocked prompts can extend the timeout.
+
+### Gemini image generation (paid)
+
+The Image Studio also supports Google's Gemini 3.1 Flash Lite Image model. It generates 1K images and supports portrait 3:4. Google documents the model as `gemini-3.1-flash-lite-image`; pricing and availability can change, so check the [official Gemini API pricing page](https://ai.google.dev/gemini-api/docs/pricing) before use.
+
+1. Create an API key in [Google AI Studio](https://aistudio.google.com/app/apikey).
+2. In Cloudflare dashboard → **Workers & Pages** → **studio-chat-api** → **Settings** → **Variables and Secrets**, add a secret named `GEMINI_API_KEY`.
+3. Paste the key directly into Cloudflare's secret-value field. Never paste it into GitHub, the website, or this chat.
+4. Deploy the updated Worker, reload Studio Chat, connect the Worker, then choose **Gemini · Paid** in Image Studio.
+
+The Worker calls Google's GenerateContent API and returns the generated image to the browser. The key is never sent to the browser. Gemini remains subject to Google's content policies and billing. Because the Worker endpoint is public, configure Cloudflare rate limiting and Google API usage limits/budget alerts before sharing the app widely.
