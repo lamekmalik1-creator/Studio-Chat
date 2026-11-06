@@ -215,6 +215,49 @@ async function handleHordeResult(request, env, id) {
   return new Response(imageResponse.body, { status: 200, headers });
 }
 
+
+async function handleGeminiImage(request, env) {
+  if (!env.GEMINI_API_KEY) return json(request, env, errorMessage("The Worker is missing its GEMINI_API_KEY secret. Add it in Cloudflare before using Gemini.", 503), 503);
+  let body;
+  try { body = await readJson(request); } catch (error) { return json(request, env, errorMessage(error.message), 400); }
+  const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
+  if (!prompt || prompt.length > 6000) return json(request, env, errorMessage("Gemini prompts must be between 1 and 6,000 characters."), 400);
+  const aspectRatio = typeof body.aspectRatio === "string" ? body.aspectRatio : "3:4";
+  const allowedRatios = new Set(["1:1", "1:4", "4:1", "1:8", "8:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"]);
+  if (!allowedRatios.has(aspectRatio)) return json(request, env, errorMessage("Unsupported Gemini image aspect ratio."), 400);
+  const upstream = await fetch("https://generativelanguage.googleapis.com/v1/models/gemini-3.1-flash-lite-image:generateContent", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { responseModalities: ["IMAGE"], responseFormat: { image: { aspectRatio } } }
+    })
+  });
+  const payload = await upstream.json().catch(() => ({}));
+  if (!upstream.ok) {
+    const detail = String(payload.error?.message || "Google Gemini returned an unexpected error.").slice(0, 500);
+    const status = upstream.status === 429 ? 429 : upstream.status === 400 ? 400 : 502;
+    return json(request, env, errorMessage("Gemini image generation failed (" + upstream.status + "): " + detail, status), status);
+  }
+  const parts = payload.candidates?.[0]?.content?.parts || [];
+  const imagePart = parts.find((part) => part.inlineData?.data || part.inline_data?.data);
+  const imageData = imagePart?.inlineData || imagePart?.inline_data;
+  if (!imageData?.data) {
+    const detail = parts.map((part) => part.text || "").filter(Boolean).join(" ").slice(0, 400);
+    return json(request, env, errorMessage(detail || "Gemini did not return an image. Try adjusting the prompt.", 502), 502);
+  }
+  const binary = atob(imageData.data);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const candidateMime = imageData.mimeType || imageData.mime_type || "image/png";
+  const mimeType = /^image\/(png|jpeg|webp)$/.test(candidateMime) ? candidateMime : "image/png";
+  const headers = new Headers(corsHeaders(request, env));
+  headers.set("Content-Type", mimeType);
+  headers.set("Cache-Control", "no-store");
+  headers.set("X-Content-Type-Options", "nosniff");
+  return new Response(bytes, { status: 200, headers });
+}
+
 export default {
   async fetch(request, env) {
     if (!originAllowed(request, env)) {
@@ -227,11 +270,13 @@ export default {
     const url = new URL(request.url);
     try {
       if (request.method === "GET" && url.pathname === "/api/health") {
-        return json(request, env, { ok: true, service: "studio-chat-api", provider: "openrouter", image_provider: "ai-horde" });
+        return json(request, env, { ok: true, service: "studio-chat-api", provider: "openrouter", image_providers: { ai_horde: Boolean(env.AI_HORDE_API_KEY), gemini: Boolean(env.GEMINI_API_KEY) } });
       }
       if (request.method === "GET" && url.pathname === "/api/models") return await handleModels(request, env);
       if (request.method === "POST" && url.pathname === "/api/chat") return await handleChat(request, env);
       if (request.method === "GET" && url.pathname === "/api/images/models") return await handleHordeModels(request, env);
+      if (request.method === "GET" && url.pathname === "/api/images/providers") return json(request, env, { ai_horde: Boolean(env.AI_HORDE_API_KEY), gemini: Boolean(env.GEMINI_API_KEY) });
+      if (request.method === "POST" && url.pathname === "/api/images/gemini") return await handleGeminiImage(request, env);
       if (request.method === "POST" && url.pathname === "/api/images/submit") return await handleHordeSubmit(request, env);
       const hordeStatusMatch = url.pathname.match(/^\/api\/images\/status\/([^/]+)$/);
       if (request.method === "GET" && hordeStatusMatch) return await handleHordeStatus(request, env, hordeStatusMatch[1]);

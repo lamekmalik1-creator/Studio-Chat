@@ -3,6 +3,8 @@ const STORAGE_CHARACTER = "studioChat.character.v1";
 const STORAGE_MESSAGES = "studioChat.messages.v1";
 const STORAGE_API_BASE = "studioChat.apiBase.v1";
 const STORAGE_MODEL = "studioChat.model.v1";
+const STORAGE_IMAGE_PROVIDER = "studioChat.imageProvider.v1";
+const STORAGE_IMAGE_MODEL = "studioChat.imageModel.v1";
 
 let character = loadJSON(STORAGE_CHARACTER, null);
 let messages = loadJSON(STORAGE_MESSAGES, []);
@@ -434,23 +436,41 @@ function setImageAuthStatus(message) {
 }
 async function loadHordeImageModels() {
   const select = $("imageModelSelect");
+  const statusParts = [];
   try {
     const response = await apiFetch("/api/images/models");
     const data = await response.json();
     const models = Array.isArray(data.models) ? data.models : [];
-    if (!models.length) throw new Error("No image models are currently available.");
     select.replaceChildren();
-    for (const model of models) {
+    if (!models.length) {
       const option = document.createElement("option");
-      option.value = model.name;
-      option.textContent = model.name + (model.count ? " · " + model.count + " workers" : "");
+      option.value = "stable_diffusion";
+      option.textContent = "No active AI Horde models";
       select.append(option);
+    } else {
+      for (const model of models) {
+        const option = document.createElement("option");
+        option.value = model.name;
+        option.textContent = model.name + (model.count ? " · " + model.count + " workers" : "");
+        select.append(option);
+      }
+      const savedModel = localStorage.getItem(STORAGE_IMAGE_MODEL);
+      select.value = models.some((model) => model.name === savedModel) ? savedModel :
+        models.some((model) => model.name === "stable_diffusion") ? "stable_diffusion" : models[0].name;
     }
-    select.value = models.some((model) => model.name === "stable_diffusion") ? "stable_diffusion" : models[0].name;
-    setImageAuthStatus(data.configured ? ("AI Horde connected through your Cloudflare Worker. " + models.length + " active image models found.") : "Models are listed, but the Worker is missing AI_HORDE_API_KEY. Add the secret in Cloudflare before generating.");
-  } catch (error) {
-    setImageAuthStatus("AI Horde is not ready yet. Add the AI_HORDE_API_KEY Worker secret, then reconnect. " + error.message);
-  }
+    statusParts.push(data.configured ? "AI Horde connected (" + models.length + " active models)." : "AI Horde key missing: add AI_HORDE_API_KEY in Cloudflare.");
+  } catch (error) { statusParts.push("AI Horde unavailable: " + error.message); }
+  try {
+    const response = await apiFetch("/api/images/providers");
+    const providers = await response.json();
+    statusParts.push(providers.gemini ? "Gemini is connected." : "Gemini not configured: add GEMINI_API_KEY in Cloudflare.");
+  } catch (error) { statusParts.push("Could not check Gemini: " + error.message); }
+  setImageAuthStatus(statusParts.join(" "));
+}
+function updateImageProviderControls() {
+  const provider = $("imageProviderSelect").value || "ai-horde";
+  $("imageModelSelect").closest("div").hidden = provider === "gemini";
+  localStorage.setItem(STORAGE_IMAGE_PROVIDER, provider);
 }
 function compactImageText(value, maxLength) {
   const text = String(value || "")
@@ -574,45 +594,56 @@ async function generateStoryImage() {
   }
   const button = $("generateImageBtn");
   button.disabled = true;
-  button.textContent = "Queuing…";
-  let requestId = null;
+  let blob;
+  let modelName;
+  let width;
+  let height;
+  const provider = $("imageProviderSelect").value || "ai-horde";
+  const ratio = $("imageRatioSelect").value || "3:4";
   try {
-    const [width, height] = imageDimensions($("imageRatioSelect").value);
-    const submitResponse = await apiFetch("/api/images/submit", {
-      method: "POST",
-      body: JSON.stringify({
-        prompt,
-        model: $("imageModelSelect").value || "stable_diffusion",
-        width,
-        height
-      })
-    });
-    const submitted = await submitResponse.json();
-    requestId = submitted.id;
-    if (!requestId) throw new Error(submitted.error || "AI Horde did not return a generation ID.");
-    $("imageStatus").textContent = "Queued on AI Horde. Waiting for a volunteer worker…";
-    button.textContent = "Waiting…";
-
-    const startedAt = Date.now();
-    let status = null;
-    while (Date.now() - startedAt < 8 * 60 * 1000) {
-      await new Promise((resolve) => setTimeout(resolve, 3500));
-      const statusResponse = await apiFetch("/api/images/status/" + encodeURIComponent(requestId));
-      status = await statusResponse.json();
-      if (status.done) break;
-      const queue = Number.isFinite(status.queue_position) ? " Queue position: " + status.queue_position + "." : "";
-      const wait = Number.isFinite(status.wait_time) && status.wait_time > 0 ? " Estimated wait: " + Math.ceil(status.wait_time) + "s." : "";
-      $("imageStatus").textContent = "AI Horde is processing your image." + queue + wait;
+    [width, height] = imageDimensions(ratio);
+    if (provider === "gemini") {
+      button.textContent = "Generating with Gemini…";
+      $("imageStatus").textContent = "Sending your prompt to Gemini 3.1 Flash Lite Image…";
+      const response = await apiFetch("/api/images/gemini", {
+        method: "POST",
+        body: JSON.stringify({ prompt, aspectRatio: ratio })
+      });
+      blob = await response.blob();
+      modelName = "gemini-3.1-flash-lite-image";
+    } else {
+      button.textContent = "Queuing…";
+      const submitResponse = await apiFetch("/api/images/submit", {
+        method: "POST",
+        body: JSON.stringify({ prompt, model: $("imageModelSelect").value || "stable_diffusion", width, height })
+      });
+      const submitted = await submitResponse.json();
+      const requestId = submitted.id;
+      if (!requestId) throw new Error(submitted.error || "AI Horde did not return a generation ID.");
+      modelName = $("imageModelSelect").value || "stable_diffusion";
+      $("imageStatus").textContent = "Queued on AI Horde. Waiting for a volunteer worker…";
+      button.textContent = "Waiting…";
+      const startedAt = Date.now();
+      let status = null;
+      while (Date.now() - startedAt < 8 * 60 * 1000) {
+        await new Promise((resolve) => setTimeout(resolve, 3500));
+        const statusResponse = await apiFetch("/api/images/status/" + encodeURIComponent(requestId));
+        status = await statusResponse.json();
+        if (status.done) break;
+        const queue = Number.isFinite(status.queue_position) ? " Queue position: " + status.queue_position + "." : "";
+        const wait = Number.isFinite(status.wait_time) && status.wait_time > 0 ? " Estimated wait: " + Math.ceil(status.wait_time) + "s." : "";
+        $("imageStatus").textContent = "AI Horde is processing your image." + queue + wait;
+      }
+      if (!status?.done) throw new Error("This generation is still queued after 8 minutes. Your request ID is " + requestId + ". You can try again later.");
+      if (status.faulted) throw new Error("AI Horde could not complete this request. Try another model or a simpler prompt.");
+      button.textContent = "Downloading…";
+      $("imageStatus").textContent = "Generation finished. Downloading your image…";
+      const imageResponse = await apiFetch("/api/images/result/" + encodeURIComponent(requestId));
+      blob = await imageResponse.blob();
     }
-    if (!status?.done) throw new Error("This generation is still queued after 8 minutes. Your request ID is " + requestId + ". You can try again later.");
-    if (status.faulted) throw new Error("AI Horde could not complete this request. Try another model or a simpler prompt.");
-    button.textContent = "Downloading…";
-    $("imageStatus").textContent = "Generation finished. Downloading your image…";
-    const imageResponse = await apiFetch("/api/images/result/" + encodeURIComponent(requestId));
-    const blob = await imageResponse.blob();
-    if (!blob.type.startsWith("image/")) throw new Error("AI Horde returned an unexpected file type: " + (blob.type || "unknown"));
+    if (!blob || !blob.type.startsWith("image/")) throw new Error("The image provider returned an unexpected file type: " + (blob?.type || "unknown"));
     const id = makeId();
-    const record = { id, blob, prompt, model: $("imageModelSelect").value, width, height, createdAt: Date.now() };
+    const record = { id, blob, prompt, model: modelName, provider, aspectRatio: ratio, width, height, createdAt: Date.now() };
     await saveStoredImage(record);
     if (currentGeneratedImageUrl) URL.revokeObjectURL(currentGeneratedImageUrl);
     currentGeneratedImageUrl = URL.createObjectURL(blob);
@@ -626,7 +657,7 @@ async function generateStoryImage() {
       renderMessages();
     }
     await renderImageGallery();
-    $("imageStatus").textContent = "Image generated and saved in your local gallery." + (character ? " It was also added to this conversation." : "");
+    $("imageStatus").textContent = "Image generated with " + (provider === "gemini" ? "Gemini" : "AI Horde") + " and saved in your local gallery." + (character ? " It was also added to this conversation." : "");
   } catch (error) {
     $("imageStatus").textContent = error.message;
   } finally {
@@ -635,6 +666,10 @@ async function generateStoryImage() {
   }
 }
 $("refreshHordeModels").addEventListener("click", loadHordeImageModels);
+$("imageProviderSelect").value = localStorage.getItem(STORAGE_IMAGE_PROVIDER) || "ai-horde";
+$("imageProviderSelect").addEventListener("change", updateImageProviderControls);
+$("imageModelSelect").addEventListener("change", () => localStorage.setItem(STORAGE_IMAGE_MODEL, $("imageModelSelect").value));
+updateImageProviderControls();
 $("buildImagePrompt").addEventListener("click", buildStoryImagePrompt);
 $("generateImageBtn").addEventListener("click", generateStoryImage);
 $("openImageComposer").addEventListener("click", () => {

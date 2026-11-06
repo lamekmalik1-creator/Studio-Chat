@@ -73,10 +73,10 @@
       <p class="hint">Generate an image only when you choose. Studio Chat can build a starting prompt from your character profile and recent roleplay; you can edit everything before generation.</p>
       <div class="image-auth-card">
         <div class="image-auth-top">
-          <div><strong>AI Horde / Stable Horde</strong><p>Uses volunteer GPU workers. Your registered AI Horde key is stored only as a Cloudflare Worker secret, never in this website or GitHub.</p></div>
-          <button id="refreshHordeModels" class="secondary-btn" type="button">Refresh models</button>
+          <div><strong>Image providers</strong><p>Choose AI Horde for volunteer GPU generation or Gemini 3.1 Flash Lite Image for paid generation. Both API keys stay in Cloudflare Worker secrets, never in this website or GitHub.</p></div>
+          <button id="refreshHordeModels" class="secondary-btn" type="button">Refresh providers &amp; models</button>
         </div>
-        <p class="status" id="imageAuthStatus" aria-live="polite">Connect your Cloudflare Worker in the Chat tab. Add your AI Horde key as the AI_HORDE_API_KEY Worker secret.</p>
+        <p class="status" id="imageAuthStatus" aria-live="polite">Connect your Cloudflare Worker in the Chat tab. Configure AI_HORDE_API_KEY and/or GEMINI_API_KEY as Cloudflare Worker secrets.</p>
         <p class="status"><a href="https://api.stablehorde.net/generate/image/" target="_blank" rel="noopener">Open the AI Horde web generator to test it directly</a></p>
         <p class="privacy-note">AI Horde is community-powered and free to use within its queue and Kudos rules. Generation speed depends on available volunteer workers, model availability, and your account priority. Worker operators may be able to see prompts and generated images.</p>
       </div>
@@ -87,7 +87,8 @@
         <label for="imagePrompt">Image prompt — review and edit before generating</label>
         <textarea id="imagePrompt" rows="10" placeholder="Tap “Build from story” to combine the character profile and recent conversation, or write your own prompt..."></textarea>
         <div class="form-grid image-settings">
-          <div><label for="imageModelSelect">Image model</label><select id="imageModelSelect"><option value="stable_diffusion">Loading AI Horde models…</option></select></div>
+          <div><label for="imageProviderSelect">Image provider</label><select id="imageProviderSelect"><option value="ai-horde">AI Horde · Free</option><option value="gemini">Gemini · Paid</option></select></div>
+          <div><label for="imageModelSelect">AI Horde model</label><select id="imageModelSelect"><option value="stable_diffusion">Loading AI Horde models…</option></select></div>
           <div><label for="imageRatioSelect">Image shape</label><select id="imageRatioSelect"><option value="3:4">Portrait · 3:4</option><option value="2:3">Portrait · 2:3</option><option value="1:1">Square · 1:1</option><option value="4:3">Landscape · 4:3</option><option value="16:9">Wide · 16:9</option></select></div>
         </div>
         <button id="generateImageBtn" class="primary" type="button">Generate image</button>
@@ -103,7 +104,7 @@
       </div>
     </section>
     <footer>
-      <p>Studio Chat is an independent project. Chat uses OpenRouter through your Cloudflare Worker; images use AI Horde volunteer workers. Availability and queue times depend on the providers.</p>
+      <p>Studio Chat is an independent project. Chat uses OpenRouter through your Cloudflare Worker; images can use AI Horde volunteer workers or paid Google Gemini image generation. Provider policies, availability, and costs apply.</p>
       <button id="helpInstall" class="text-button">How to install this app</button>
     </footer>
   </main>
