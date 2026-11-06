@@ -502,16 +502,18 @@ async function handlePollinationsCallback() {
   sessionStorage.removeItem("studioChat.pollinationsPkce.v1");
   setImageAuthStatus("Finishing secure Pollinations connection…");
   try {
+    const tokenParams = new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: pkce.redirectUri,
+      code_verifier: pkce.verifier
+    });
+    const clientId = $("pollinationsClientId").value.trim() || localStorage.getItem(POLLINATIONS_APP_KEY_STORAGE) || "";
+    if (clientId) tokenParams.set("client_id", clientId);
     const response = await fetch("https://enter.pollinations.ai/api/oauth/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        code,
-        client_id: $("pollinationsClientId").value.trim() || localStorage.getItem(POLLINATIONS_APP_KEY_STORAGE) || "",
-        redirect_uri: pkce.redirectUri,
-        code_verifier: pkce.verifier
-      })
+      body: tokenParams
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.access_token) throw new Error(data.error_description || data.error || "Token exchange failed.");
