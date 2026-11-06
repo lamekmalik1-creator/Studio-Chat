@@ -75,3 +75,17 @@ Character profiles and chat history are stored in the browser's local storage on
 ## Existing project
 
 This project is independent and is not affiliated with OpenRouter, Cloudflare, or Perchance.
+
+
+## Manual Pollinations image generation
+
+The Image Studio uses Pollinations Pay (BYOP) so each person authorizes their own image-generation budget. No Pollinations secret key is stored in the frontend, GitHub repository, or Cloudflare Worker.
+
+- Register a Pollinations App Key at https://enter.pollinations.ai/keys (optional, but recommended for app attribution).
+- Set its exact redirect URI to `https://lamekmalik1-creator.github.io/Studio-Chat/`.
+- In Studio Chat → Image Studio, paste the public `pk_...` App Key and tap **Save**, then **Connect Pollinations**.
+- Review the Pollinations consent screen. The app requests image-model access, a 5-Pollen budget cap, and a 7-day authorization. The user can adjust or reject the request.
+- Build a prompt from the character profile and recent story messages, edit it, then tap **Generate image**. Image generation is never automatic.
+- Generated images and image message references are saved in this browser's IndexedDB/local storage. Clearing browser site data can erase them.
+
+Pollinations controls current model availability, pricing, and Pollen requirements. Image generation is not guaranteed to be free or unlimited. The OAuth access token is kept in memory only; after reloading the page, connect again.
