@@ -118,6 +118,97 @@ async function handleChat(request, env) {
   return new Response(upstream.body, { status: 200, headers });
 }
 
+
+async function hordeFetch(path, env, init = {}) {
+  if (!env.AI_HORDE_API_KEY) throw new Error("The Worker is missing its AI_HORDE_API_KEY secret. Add it in Cloudflare Workers & Pages → studio-chat-api → Settings → Variables and Secrets.");
+  return fetch("https://aihorde.net/api/v2" + path, {
+    ...init,
+    headers: {
+      "apikey": env.AI_HORDE_API_KEY,
+      "Client-Agent": "studio-chat:1.0:github.com/lamekmalik1-creator/Studio-Chat",
+      ...(init.headers || {})
+    }
+  });
+}
+
+async function handleHordeModels(request, env) {
+  const upstream = await fetch("https://aihorde.net/api/v2/status/models");
+  if (!upstream.ok) return json(request, env, errorMessage("Could not load active AI Horde image models.", 502), 502);
+  const payload = await upstream.json();
+  const models = (Array.isArray(payload) ? payload : [])
+    .filter((model) => model && model.name && Number(model.count || 0) > 0)
+    .map((model) => ({ name: model.name, count: Number(model.count || 0), performance: Number(model.performance || 0) }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  return json(request, env, { models });
+}
+
+async function handleHordeSubmit(request, env) {
+  let body;
+  try { body = await readJson(request); }
+  catch (error) { return json(request, env, errorMessage(error.message), 400); }
+  const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
+  if (!prompt || prompt.length > 8000) return json(request, env, errorMessage("Provide an image prompt between 1 and 8000 characters."), 400);
+  const model = typeof body.model === "string" ? body.model.trim() : "stable_diffusion";
+  if (!model || model.length > 120) return json(request, env, errorMessage("Invalid image model."), 400);
+  const width = Math.round(Number(body.width));
+  const height = Math.round(Number(body.height));
+  const allowedSizes = new Set(["768x1024", "768x1152", "1024x1024", "1024x768", "1152x648"]);
+  if (!allowedSizes.has(width + "x" + height)) return json(request, env, errorMessage("Unsupported image dimensions."), 400);
+
+  const upstream = await hordeFetch("/generate/async", env, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      prompt,
+      params: { width, height, steps: 25, cfg_scale: 7.5, n: 1 },
+      models: [model],
+      nsfw: false,
+      censor_nsfw: true,
+      trusted_workers: false,
+      allow_downgrade: true,
+      r2: true
+    })
+  });
+  const payload = await upstream.json().catch(() => ({}));
+  if (!upstream.ok || !payload.id) {
+    const detail = payload.message || payload.error || ("HTTP " + upstream.status);
+    return json(request, env, errorMessage("AI Horde could not queue this image: " + String(detail).slice(0, 350), upstream.status === 429 ? 429 : 502), upstream.status === 429 ? 429 : 502);
+  }
+  return json(request, env, { id: payload.id, kudos: payload.kudos || null, message: payload.message || "Request queued." }, 202);
+}
+
+async function handleHordeStatus(request, env, id) {
+  if (!/^[a-zA-Z0-9-]{8,80}$/.test(id)) return json(request, env, errorMessage("Invalid AI Horde request ID."), 400);
+  const upstream = await hordeFetch("/generate/check/" + encodeURIComponent(id), env);
+  const payload = await upstream.json().catch(() => ({}));
+  if (!upstream.ok) return json(request, env, errorMessage(payload.message || "Could not check AI Horde generation status.", 502), 502);
+  return json(request, env, {
+    done: Boolean(payload.done),
+    faulted: Boolean(payload.faulted),
+    queue_position: Number.isFinite(payload.queue_position) ? payload.queue_position : null,
+    wait_time: Number.isFinite(payload.wait_time) ? payload.wait_time : null,
+    kudos: Number.isFinite(payload.kudos) ? payload.kudos : null
+  });
+}
+
+async function handleHordeResult(request, env, id) {
+  if (!/^[a-zA-Z0-9-]{8,80}$/.test(id)) return json(request, env, errorMessage("Invalid AI Horde request ID."), 400);
+  const upstream = await hordeFetch("/generate/status/" + encodeURIComponent(id), env);
+  const payload = await upstream.json().catch(() => ({}));
+  if (!upstream.ok) return json(request, env, errorMessage(payload.message || "Could not retrieve AI Horde result.", 502), 502);
+  const imageUrl = payload.generations && payload.generations[0] && payload.generations[0].img;
+  if (!imageUrl || typeof imageUrl !== "string" || !imageUrl.startsWith("https://")) {
+    return json(request, env, errorMessage("AI Horde has not returned a downloadable image yet.", 409), 409);
+  }
+  const imageResponse = await fetch(imageUrl);
+  if (!imageResponse.ok) return json(request, env, errorMessage("Could not download the generated image from AI Horde.", 502), 502);
+  const headers = new Headers(corsHeaders(request, env));
+  headers.set("Content-Type", imageResponse.headers.get("Content-Type") || "image/png");
+  headers.set("Cache-Control", "no-store");
+  headers.set("X-Content-Type-Options", "nosniff");
+  return new Response(imageResponse.body, { status: 200, headers });
+}
+
 export default {
   async fetch(request, env) {
     if (!originAllowed(request, env)) {
@@ -130,10 +221,16 @@ export default {
     const url = new URL(request.url);
     try {
       if (request.method === "GET" && url.pathname === "/api/health") {
-        return json(request, env, { ok: true, service: "studio-chat-api", provider: "openrouter" });
+        return json(request, env, { ok: true, service: "studio-chat-api", provider: "openrouter", image_provider: "ai-horde" });
       }
       if (request.method === "GET" && url.pathname === "/api/models") return await handleModels(request, env);
       if (request.method === "POST" && url.pathname === "/api/chat") return await handleChat(request, env);
+      if (request.method === "GET" && url.pathname === "/api/images/models") return await handleHordeModels(request, env);
+      if (request.method === "POST" && url.pathname === "/api/images/submit") return await handleHordeSubmit(request, env);
+      const hordeStatusMatch = url.pathname.match(/^\/api\/images\/status\/([^/]+)$/);
+      if (request.method === "GET" && hordeStatusMatch) return await handleHordeStatus(request, env, hordeStatusMatch[1]);
+      const hordeResultMatch = url.pathname.match(/^\/api\/images\/result\/([^/]+)$/);
+      if (request.method === "GET" && hordeResultMatch) return await handleHordeResult(request, env, hordeResultMatch[1]);
       return json(request, env, errorMessage("Route not found.", 404), 404);
     } catch (error) {
       return json(request, env, errorMessage(error.message || "Unexpected Worker error.", 500), 500);
