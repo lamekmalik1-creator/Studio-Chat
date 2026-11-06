@@ -47,7 +47,7 @@
       </form>
     </section>
     <section id="chat" class="panel">
-      <div class="panel-heading"><div><p class="eyebrow">02 / ROLEPLAY</p><h2>Character chat</h2></div><button id="clearChat" class="text-button" type="button">Clear conversation</button></div>
+      <div class="panel-heading"><div><p class="eyebrow">02 / ROLEPLAY</p><h2>Character chat</h2></div><div class="chat-heading-actions"><button id="openImageComposer" class="secondary-btn" type="button">▧ Generate scene image</button><button id="clearChat" class="text-button" type="button">Clear conversation</button></div></div>
       <div class="connection-card">
         <label for="apiBase">Cloudflare Worker URL</label>
         <div class="connection-row">
@@ -69,13 +69,41 @@
       <p class="privacy-note">Your chat is sent to OpenRouter through your Cloudflare Worker. Review the privacy policies of the AI provider and selected model. Conversation history is stored in this browser only.</p>
     </section>
     <section id="image" class="panel">
-      <div class="panel-heading"><div><p class="eyebrow">03 / CREATE</p><h2>Image studio</h2></div></div>
-      <p class="hint">Image generation will be integrated in a later phase. For now, the existing Perchance image generator remains available as a separate tool.</p>
-      <div class="launch-card">
-        <div class="launch-icon">▧</div>
-        <h3>Perchance AI Image Generator</h3>
-        <p>Open the official image generator directly in a new tab.</p>
-        <a class="launch-btn" href="https://perchance.org/ai-text-to-image-generator" target="_blank" rel="noopener">Open image generator ↗</a>
+      <div class="panel-heading"><div><p class="eyebrow">03 / CREATE</p><h2>Story image studio</h2></div></div>
+      <p class="hint">Generate an image only when you choose. Studio Chat can build a starting prompt from your character profile and recent roleplay; you can edit everything before generation.</p>
+      <div class="image-auth-card">
+        <div class="image-auth-top">
+          <div><strong>Pollinations connection</strong><p>Connect your own Pollinations balance. Your authorization stays in this tab and is not saved in local storage.</p></div>
+          <button id="connectPollinations" class="secondary-btn" type="button">Connect Pollinations</button>
+        </div>
+        <label for="pollinationsClientId">Pollinations App Key <span class="optional-label">(optional)</span></label>
+        <div class="connection-row">
+          <input id="pollinationsClientId" type="text" inputmode="text" autocomplete="off" placeholder="pk_... (optional)">
+          <button id="savePollinationsClientId" class="secondary-btn" type="button">Save</button>
+        </div>
+        <p class="status" id="imageAuthStatus" aria-live="polite">Not connected. Connect before generating an image.</p>
+        <p class="privacy-note">Pollinations may use Pollen from the balance you authorize. Review the budget on its consent screen. Studio Chat does not provide unlimited free image generation.</p>
+      </div>
+      <div class="image-editor">
+        <div class="image-editor-heading"><h3>1. Prepare your scene</h3><button id="buildImagePrompt" class="secondary-btn" type="button">↻ Build from story</button></div>
+        <label for="imageSceneNotes">Current scene details <span class="optional-label">(optional)</span></label>
+        <textarea id="imageSceneNotes" rows="3" placeholder="Current outfit, condition, pose, expression, location, or anything that changed in the story..."></textarea>
+        <label for="imagePrompt">Image prompt — review and edit before generating</label>
+        <textarea id="imagePrompt" rows="10" placeholder="Tap “Build from story” to combine the character profile and recent conversation, or write your own prompt..."></textarea>
+        <div class="form-grid image-settings">
+          <div><label for="imageModelSelect">Image model</label><select id="imageModelSelect"><option value="tongyi-mai/z-image-turbo">Loading image models…</option></select></div>
+          <div><label for="imageRatioSelect">Image shape</label><select id="imageRatioSelect"><option value="3:4">Portrait · 3:4</option><option value="2:3">Portrait · 2:3</option><option value="1:1">Square · 1:1</option><option value="4:3">Landscape · 4:3</option><option value="16:9">Wide · 16:9</option></select></div>
+        </div>
+        <button id="generateImageBtn" class="primary" type="button">Generate image</button>
+        <p id="imageStatus" class="status" aria-live="polite">No image generated yet. Generation starts only when you tap the button.</p>
+        <div id="imageOutput" class="image-output" hidden>
+          <img id="generatedImage" alt="Your generated scene">
+          <div class="output-actions"><a id="downloadGeneratedImage" download="studio-chat-image.png">Save image</a></div>
+        </div>
+      </div>
+      <div class="gallery-section">
+        <div class="image-editor-heading"><h3>2. Local image gallery</h3><span class="optional-label">Saved on this device</span></div>
+        <div id="imageGallery" class="image-gallery"><p class="gallery-empty">Your generated images will appear here.</p></div>
       </div>
     </section>
     <footer>
