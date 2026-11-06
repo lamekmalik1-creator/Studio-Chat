@@ -160,11 +160,11 @@ function buildSystemPrompt() {
 function cleanCharacterReply(raw) {
   let answer = String(raw || "");
   // Remove hidden reasoning completely, including unfinished blocks while streaming.
-  answer = answer.replace(/<(think|analysis|reasoning)\\b[^>]*>[\\s\\S]*?(?:<\\/\\1\\s*>|$)/gi, "");
-  answer = answer.replace(/<\\/?(?:think|analysis|reasoning)\\b[^>]*>/gi, "");
-  answer = answer.replace(/<\\|(?:im_start|im_end|endoftext|assistant|analysis|final|thought)\\|>/gi, "");
-  answer = answer.replace(/\\n\\s*(?:#{1,6}\\s*)?(?:user|you|human)\\s*:[\\s\\S]*$/i, "");
-  const escapedName = (character?.name || "").replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&");
+  answer = answer.replace(/<(think|analysis|reasoning)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)/gi, "");
+  answer = answer.replace(/<\/?(?:think|analysis|reasoning)\b[^>]*>/gi, "");
+  answer = answer.replace(/<\|(?:im_start|im_end|endoftext|assistant|analysis|final|thought)\|>/gi, "");
+  answer = answer.replace(/\n\s*(?:#{1,6}\s*)?(?:user|you|human)\s*:[\s\S]*$/i, "");
+  const escapedName = (character?.name || "").replace(/[.*+?^\${}()|[\]\\]/g, "\\$&");
   if (escapedName) answer = answer.replace(new RegExp("^\\s*(?:" + escapedName + "|assistant)\\s*:\\s*", "i"), "");
   return answer.trim();
 }
