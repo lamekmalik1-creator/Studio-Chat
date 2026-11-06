@@ -8,7 +8,7 @@ A mobile-first installable character roleplay app. The frontend is hosted on Git
 - Chat replies stream into the conversation as they are generated.
 - The model picker loads currently available free OpenRouter models.
 - `openrouter/free` is the default router; there is no paid-model fallback.
-- The image studio remains a separate Perchance link for now. Manual, storyline-aware Pollinations generation is planned for a later phase.
+- Manual, storyline-aware AI Horde image generation is available in the Image Studio.
 
 ## Deploy the frontend
 
