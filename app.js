@@ -279,9 +279,6 @@ $("chatForm").addEventListener("submit", async (event) => {
     $("apiBase").focus();
     return;
   }
-  waiting = true;
-  $("sendBtn").disabled = true;
-  $("userMessage").disabled = true;
   if (messages.some((message) => message.role === "user" && message.failed)) {
     setChatStatus("Please resend the failed message before sending a new one.");
     return;
