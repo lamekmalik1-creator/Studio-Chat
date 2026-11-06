@@ -436,13 +436,13 @@ function randomBase64Url(bytes) {
   crypto.getRandomValues(values);
   let binary = "";
   values.forEach((value) => { binary += String.fromCharCode(value); });
-  return btoa(binary).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 async function sha256Base64Url(value) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   let binary = "";
   new Uint8Array(digest).forEach((byte) => { binary += String.fromCharCode(byte); });
-  return btoa(binary).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 function pollinationsRedirectUri() {
   return location.origin + location.pathname;
