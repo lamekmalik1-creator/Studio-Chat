@@ -139,7 +139,7 @@ async function handleHordeModels(request, env) {
     .filter((model) => model && model.name && Number(model.count || 0) > 0)
     .map((model) => ({ name: model.name, count: Number(model.count || 0), performance: Number(model.performance || 0) }))
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-  return json(request, env, { models });
+  return json(request, env, { models, configured: Boolean(env.AI_HORDE_API_KEY) });
 }
 
 async function handleHordeSubmit(request, env) {
