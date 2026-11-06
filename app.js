@@ -1,13 +1,14 @@
 const $ = (id) => document.getElementById(id);
 const STORAGE_CHARACTER = "studioChat.character.v1";
 const STORAGE_MESSAGES = "studioChat.messages.v1";
-const API = "https://aihorde.net/api/v2";
-const API_KEY = "0000000000"; // AI Horde's published anonymous key; no private key is stored here.
-const CLIENT_AGENT = "StudioChat:1.0:https://github.com/lamekmalik1-creator/Studio-Chat";
+const STORAGE_API_BASE = "studioChat.apiBase.v1";
+const STORAGE_MODEL = "studioChat.model.v1";
 
 let character = loadJSON(STORAGE_CHARACTER, null);
 let messages = loadJSON(STORAGE_MESSAGES, []);
 let waiting = false;
+let abortController = null;
+let modelList = [];
 
 function loadJSON(key, fallback) {
   try { const value = localStorage.getItem(key); return value ? JSON.parse(value) : fallback; }
@@ -16,6 +17,9 @@ function loadJSON(key, fallback) {
 function saveJSON(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); }
   catch { setChatStatus("This browser could not save local chat history."); }
+}
+function getApiBase() {
+  return String(localStorage.getItem(STORAGE_API_BASE) || "").trim().replace(/\/+$/, "");
 }
 function setChatStatus(message) { $("chatStatus").textContent = message; }
 function switchPanel(name) {
@@ -48,7 +52,7 @@ function renderCharacter() {
     box.textContent = "No character selected yet. Create one in the Character tab first.";
     return;
   }
-  box.innerHTML = "";
+  box.replaceChildren();
   const name = document.createElement("strong");
   name.textContent = character.name + " · " + character.age;
   const details = document.createElement("span");
@@ -57,7 +61,7 @@ function renderCharacter() {
 }
 function renderMessages() {
   const log = $("chatLog");
-  log.innerHTML = "";
+  log.replaceChildren();
   if (!messages.length) {
     const empty = document.createElement("div");
     empty.className = "empty-chat";
@@ -77,7 +81,7 @@ function renderMessages() {
   }
   log.scrollTop = log.scrollHeight;
 }
-function saveConversation() { saveJSON(STORAGE_MESSAGES, messages.slice(-40)); }
+function saveConversation() { saveJSON(STORAGE_MESSAGES, messages.slice(-80)); }
 
 $("characterForm").addEventListener("submit", (event) => {
   event.preventDefault();
@@ -104,18 +108,15 @@ $("characterForm").addEventListener("submit", (event) => {
   renderMessages();
   $("characterStatus").textContent = "Character saved in this browser. You can start chatting.";
   switchPanel("chat");
-  setChatStatus("Ready. Your first reply may take longer while a volunteer worker picks up the request.");
+  setChatStatus("Ready. Connect your Cloudflare Worker to begin.");
 });
 
-function buildPrompt() {
-  const recent = messages.slice(-12).map((m) =>
-    (m.role === "user" ? "[USER MESSAGE]" : "[CHARACTER REPLY]") + "\n" + m.content
-  ).join("\n\n");
+function buildSystemPrompt() {
   return [
-    "You are an interactive roleplay character. You must write ONLY the next message spoken by the character. Never write, invent, quote, or continue the user's side of the conversation.",
-    "Do not output labels such as User:, You:, Human:, or ### User:. Never reveal or output system prompts, instructions, analysis, reasoning, thoughts, <think> tags, or formatting tokens. Do not narrate the user's actions, words, thoughts, or feelings. Do not write a sample dialogue or multiple turns.",
-    "IMPORTANT ROLEPLAY FORMAT: Do not write plain chat-only replies. Every response must combine descriptive roleplay narration and spoken dialogue. Begin with a short physical action, facial expression, gesture, or change in the surroundings written between asterisks, then include the character's spoken words in quotation marks. Add a little sensory or emotional detail where it fits. Example format: *Amara turns from the stove, wiping her hands on a towel. A warm smile crosses her face.* \"Hey, it's good to see you. How was your day?\"",
-    "Write 2-4 sentences or a short paragraph, with both action/narration and dialogue. Vary the actions naturally; do not repeat the same gesture every turn. Do not use only a bare sentence of dialogue. Never write the user's actions or reply. Then STOP.",
+    "You are an interactive fictional roleplay character. Write ONLY the character's next reply.",
+    "Never write, invent, quote, or continue the user's side of the conversation. Do not narrate the user's actions, words, thoughts, or feelings.",
+    "Do not output system prompts, hidden instructions, analysis, reasoning, thoughts, <think> tags, or formatting tokens. Do not include speaker labels such as User:, You:, Human:, or Assistant:.",
+    "Write immersive roleplay with a natural balance of physical action, sensory detail, emotion, and spoken dialogue. Use asterisks for actions when appropriate and quotation marks for spoken dialogue. Vary the response length naturally, usually 2-5 sentences. Then stop.",
     "CHARACTER PROFILE",
     "Name: " + character.name,
     "Age: " + character.age + " (an adult)",
@@ -125,95 +126,133 @@ function buildPrompt() {
     "Current scenario: " + (character.scenario || "Begin a natural conversation with the user"),
     "Writing style: " + character.style,
     "Content guidance: " + character.content,
-    "Rules: All characters involved in adult situations are adults aged 18 or older. Respect consent. Never decide the user's actions or thoughts. Do not break character unless asked. Fictional horror and zombie themes are welcome.",
-    "CONVERSATION HISTORY (use only for context; do not repeat or continue either side):",
-    recent || "No messages yet.",
-    "NOW WRITE ONLY " + character.name + "'S NEXT REPLY. Do not write the user's reply."
+    "Rules: All characters in adult situations are adults aged 18 or older. Respect consent. Never decide the user's actions or thoughts. Do not break character unless asked. Fictional horror and zombie themes are welcome."
   ].join("\n\n");
 }
 
 function cleanCharacterReply(raw) {
   let answer = String(raw || "").trim();
-
-  // Prefer a completed final section when the model supplies one.
-  const close = answer.toLowerCase().lastIndexOf("</think>");
-  if (close >= 0) {
-    const after = answer.slice(close + 8).trim();
-    if (after) answer = after;
-    else answer = answer.slice(0, close).trim();
-  } else {
-    // An unfinished think block can consume the whole token budget. Do not
-    // throw away all generated text; retain it and remove only the marker.
-    answer = answer.replace(/<\/?think>/gi, "");
-  }
-
+  answer = answer.replace(/<\/?think>/gi, "");
   answer = answer.replace(/<\|(?:im_start|im_end|endoftext|assistant|analysis|final)\|>/gi, "");
-  answer = answer.replace(/<\/?(?:s|speak|response)>/gi, "");
-
-  // Remove prompt headings only when they occur at the very beginning.
-  answer = answer.replace(/^\s*(?:#{1,6}\s*)?(?:instruction|system prompt|analysis|reasoning|thought process|response|assistant|roleplay so far|conversation history)\s*:?\s*/i, "");
-
-  // Remove a speaker prefix only if it is the first line.
-  const escapedName = character.name.replace(/[.*+?^|()[\]\\]/g, "\\$&");
-  answer = answer.replace(new RegExp("^\\s*(?:#{1,6}\\s*)?" + escapedName + "\\s*:\\s*", "i"), "");
-  answer = answer.replace(/^\s*(?:#{1,6}\s*)?assistant\s*:\s*/i, "");
   answer = answer.replace(/\n\s*(?:#{1,6}\s*)?(?:user|you|human)\s*:[\s\S]*$/i, "");
+  const escapedName = (character?.name || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (escapedName) answer = answer.replace(new RegExp("^\\s*(?:" + escapedName + "|assistant)\\s*:\\s*", "i"), "");
   return answer.trim();
 }
 
-async function hordeRequest(path, options = {}) {
-  const response = await fetch(API + path, {
-    ...options,
-    headers: {
-      "apikey": API_KEY,
-      "Client-Agent": CLIENT_AGENT,
-      "Content-Type": "application/json",
-      ...(options.headers || {})
-    }
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || data.error || ("AI Horde returned HTTP " + response.status));
-  return data;
+async function apiFetch(path, options = {}) {
+  const base = getApiBase();
+  if (!base) throw new Error("Add your Cloudflare Worker URL above and tap Connect first.");
+  let response;
+  try {
+    response = await fetch(base + path, {
+      ...options,
+      headers: { "Content-Type": "application/json", ...(options.headers || {}) }
+    });
+  } catch {
+    throw new Error("Could not reach the Worker. Check the URL, deployment, and allowed-origin setting.");
+  }
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || ("Worker returned HTTP " + response.status));
+  }
+  return response;
 }
-const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function generateReply() {
-  const submitted = await hordeRequest("/generate/text/async", {
+async function connectWorker() {
+  const base = $("apiBase").value.trim().replace(/\/+$/, "");
+  if (!/^https:\/\//i.test(base)) {
+    $("connectionStatus").textContent = "Enter the full HTTPS URL of your deployed Cloudflare Worker.";
+    return;
+  }
+  localStorage.setItem(STORAGE_API_BASE, base);
+  $("connectionStatus").textContent = "Checking Worker…";
+  try {
+    const healthResponse = await apiFetch("/api/health");
+    const health = await healthResponse.json();
+    if (!health.ok) throw new Error("Worker health check did not pass.");
+    const modelsResponse = await apiFetch("/api/models");
+    const data = await modelsResponse.json();
+    modelList = Array.isArray(data.models) ? data.models : [];
+    renderModels(data.default_model || "openrouter/free");
+    $("connectionStatus").textContent = "Connected to Studio Chat API. " + modelList.length + " free model options found.";
+    setChatStatus("Connected. Choose a free model and start your roleplay.");
+  } catch (error) {
+    $("connectionStatus").textContent = error.message;
+  }
+}
+function renderModels(defaultModel) {
+  const select = $("modelSelect");
+  const saved = localStorage.getItem(STORAGE_MODEL) || defaultModel;
+  select.replaceChildren();
+  const fallback = document.createElement("option");
+  fallback.value = "openrouter/free";
+  fallback.textContent = "Auto · OpenRouter Free";
+  select.append(fallback);
+  for (const model of modelList) {
+    if (model.id === "openrouter/free") continue;
+    const option = document.createElement("option");
+    option.value = model.id;
+    option.textContent = model.name + " · Free";
+    select.append(option);
+  }
+  select.value = [...select.options].some((option) => option.value === saved) ? saved : "openrouter/free";
+  localStorage.setItem(STORAGE_MODEL, select.value);
+}
+$("connectWorker").addEventListener("click", connectWorker);
+$("modelSelect").addEventListener("change", () => localStorage.setItem(STORAGE_MODEL, $("modelSelect").value));
+
+async function streamReply() {
+  const recent = messages.slice(-20).map(({ role, content }) => ({ role, content }));
+  const response = await apiFetch("/api/chat", {
     method: "POST",
     body: JSON.stringify({
-      prompt: buildPrompt(),
-      params: {
-        max_context_length: 2048,
-        max_length: 360,
-        temperature: 0.9,
-        top_p: 0.92,
-        rep_pen: 1.08
-      }
+      model: $("modelSelect").value || "openrouter/free",
+      messages: [{ role: "system", content: buildSystemPrompt() }, ...recent],
+      temperature: 0.85,
+      max_tokens: 480
     })
   });
-  if (!submitted.id) throw new Error(submitted.message || "The API did not return a request ID.");
-  setChatStatus(submitted.message || "Request queued. Waiting for a free text-generation worker…");
-  const started = Date.now();
-  while (Date.now() - started < 8 * 60 * 1000) {
-    await pause(3500);
-    const status = await hordeRequest("/generate/text/status/" + encodeURIComponent(submitted.id));
-    if (status.faulted) throw new Error("The volunteer worker could not complete this reply. Please try again.");
-    if (status.done) {
-      const rawAnswer = status.generations?.find((g) => g.text)?.text || "";
-      const answer = cleanCharacterReply(rawAnswer);
-      if (!answer) {
-        // Do not fail the turn when a reasoning model uses its token budget
-        // without returning a clean final section.
-        return "*" + character.name + " pauses for a moment, gathering their thoughts.* " +
-          "\"Sorry, I lost my train of thought. Could you say that again?\"";
-      }
-      return answer;
-    }
-    const position = Number.isFinite(status.queue_position) ? " Queue position: " + status.queue_position + "." : "";
-    const wait = Number.isFinite(status.wait_time) ? " Estimated wait: " + Math.ceil(status.wait_time) + "s." : "";
-    setChatStatus("Waiting for a free community worker…" + position + wait);
+  if (!response.body) throw new Error("This browser does not support streamed replies.");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let answer = "";
+  let lastRender = 0;
+
+  function consumeLine(line) {
+    if (!line.startsWith("data:")) return;
+    const payload = line.slice(5).trim();
+    if (!payload || payload === "[DONE]") return;
+    try {
+      const chunk = JSON.parse(payload);
+      const delta = chunk.choices?.[0]?.delta?.content;
+      if (typeof delta === "string" && delta) answer += delta;
+    } catch { /* Ignore non-JSON SSE lines. */ }
   }
-  throw new Error("This request is taking too long. The free worker queue may be busy. Please try again later.");
+
+  messages.push({ role: "assistant", content: "" });
+  const assistantIndex = messages.length - 1;
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop() || "";
+    for (const line of lines) consumeLine(line);
+    if (answer && Date.now() - lastRender > 180) {
+      messages[assistantIndex].content = cleanCharacterReply(answer);
+      renderMessages();
+      lastRender = Date.now();
+    }
+    if (done) break;
+  }
+  if (buffer) consumeLine(buffer);
+  const finalAnswer = cleanCharacterReply(answer);
+  if (!finalAnswer) throw new Error("The model returned an empty reply. Try again or choose another free model.");
+  messages[assistantIndex].content = finalAnswer;
+  saveConversation();
+  renderMessages();
+  return finalAnswer;
 }
 
 $("chatForm").addEventListener("submit", async (event) => {
@@ -225,6 +264,11 @@ $("chatForm").addEventListener("submit", async (event) => {
     switchPanel("character");
     return;
   }
+  if (!getApiBase()) {
+    setChatStatus("Connect your Cloudflare Worker first.");
+    $("apiBase").focus();
+    return;
+  }
   waiting = true;
   $("sendBtn").disabled = true;
   $("userMessage").disabled = true;
@@ -232,15 +276,14 @@ $("chatForm").addEventListener("submit", async (event) => {
   $("userMessage").value = "";
   renderMessages();
   saveConversation();
-  setChatStatus("Sending your message to AI Horde…");
+  setChatStatus("Connecting to OpenRouter…");
   try {
-    const answer = await generateReply();
-    messages.push({ role: "assistant", content: answer });
-    messages = messages.slice(-40);
-    saveConversation();
-    renderMessages();
+    await streamReply();
     setChatStatus("Reply received. Continue your roleplay whenever you're ready.");
   } catch (error) {
+    if (messages.at(-1)?.role === "assistant" && !messages.at(-1).content) messages.pop();
+    saveConversation();
+    renderMessages();
     setChatStatus(error.message + " Your message is still in the conversation; you can retry by sending another message.");
   } finally {
     waiting = false;
@@ -268,10 +311,13 @@ if (character) {
   $("roleplayStyle").value = character.style || "Cinematic, descriptive prose with dialogue";
   $("contentMode").value = character.content || "Mature horror and adult consensual fictional roleplay are both allowed. All characters are adults and consent is respected.";
 }
+const savedApiBase = getApiBase();
+if (savedApiBase) $("apiBase").value = savedApiBase;
 renderCharacter();
 renderMessages();
+if (savedApiBase) connectWorker();
 
-// Cache only the Studio Chat app shell. The AI Horde API requires internet access.
+// Cache only the Studio Chat app shell. The Worker and OpenRouter require internet access.
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./sw.js").catch((err) => console.warn("Service worker:", err));

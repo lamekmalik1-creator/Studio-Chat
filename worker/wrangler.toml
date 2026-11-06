@@ -1,0 +1,7 @@
+name = "studio-chat-api"
+main = "src/index.js"
+compatibility_date = "2026-11-05"
+
+[vars]
+ALLOWED_ORIGINS = "https://lamekmalik1-creator.github.io"
+APP_URL = "https://lamekmalik1-creator.github.io/Studio-Chat/"

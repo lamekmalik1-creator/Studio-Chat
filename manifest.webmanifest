@@ -1,7 +1,7 @@
 {
-  "name": "Studio Chat — Perchance tools",
+  "name": "Studio Chat — Character roleplay studio",
   "short_name": "Studio Chat",
-  "description": "Character creator, AI character chat and standalone image generator.",
+  "description": "Create characters and chat using free AI models; image tools are being integrated.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
