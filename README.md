@@ -77,15 +77,26 @@ Character profiles and chat history are stored in the browser's local storage on
 This project is independent and is not affiliated with OpenRouter, Cloudflare, or Perchance.
 
 
-## Manual Pollinations image generation
 
-The Image Studio uses Pollinations Pay (BYOP) so each person authorizes their own image-generation budget. No Pollinations secret key is stored in the frontend, GitHub repository, or Cloudflare Worker.
+## Manual AI Horde / Stable Horde image generation
 
-- Register a Pollinations App Key at https://enter.pollinations.ai/keys (optional, but recommended for app attribution).
-- Set its exact redirect URI to `https://lamekmalik1-creator.github.io/Studio-Chat/`.
-- In Studio Chat → Image Studio, paste the public `pk_...` App Key and tap **Save**, then **Connect Pollinations**.
-- Review the Pollinations consent screen. The app requests image-model access, a 5-Pollen budget cap, and a 7-day authorization. The user can adjust or reject the request.
-- Build a prompt from the character profile and recent story messages, edit it, then tap **Generate image**. Image generation is never automatic.
-- Generated images and image message references are saved in this browser's IndexedDB/local storage. Clearing browser site data can erase them.
+The Image Studio uses AI Horde (also known as Stable Horde), a community-powered network of volunteer image-generation workers. Image generation is manual and is started only when the user taps **Generate image**.
 
-Pollinations controls current model availability, pricing, and Pollen requirements. Image generation is not guaranteed to be free or unlimited. The OAuth access token is kept in memory only; after reloading the page, connect again.
+### Configure the AI Horde key
+
+1. Register or sign in at https://aihorde.net/ and copy your API key from your account.
+2. Open the Cloudflare dashboard → **Workers & Pages** → **studio-chat-api** → **Settings** → **Variables and Secrets**.
+3. Add a secret named \`AI_HORDE_API_KEY\` and paste your key as its value. Do not put the key in GitHub, the frontend, or this chat.
+4. Redeploy the Worker if Cloudflare asks you to, then reload Studio Chat and tap **Refresh models** in Image Studio.
+
+The existing \`OPENROUTER_API_KEY\` secret is still required for character chat. Keep both secrets in Cloudflare.
+
+### How image generation works
+
+- Studio Chat loads currently active image models from AI Horde.
+- It submits the edited story prompt through the Cloudflare Worker.
+- The browser polls the Worker for queue status; the Worker downloads completed images and streams them back to the browser.
+- Generated images are saved in the browser's IndexedDB gallery and added to the current conversation.
+- The registered AI Horde key is never sent to the browser.
+
+AI Horde is free to use within its service rules, Kudos system, and volunteer capacity. Registration improves default priority compared with anonymous requests, but it does not guarantee a fast result. Queue time depends on available compatible workers, model demand, image size, and Kudos. Prompts and generated images are processed by volunteer workers; worker operators may be able to view them. See https://aihorde.net/docs/image/learn/concepts_horde/ for details.
