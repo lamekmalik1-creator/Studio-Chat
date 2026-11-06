@@ -452,36 +452,62 @@ async function loadHordeImageModels() {
     setImageAuthStatus("AI Horde is not ready yet. Add the AI_HORDE_API_KEY Worker secret, then reconnect. " + error.message);
   }
 }
+function compactImageText(value, maxLength) {
+  const text = String(value || "")
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/[*_>#]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (text.length <= maxLength) return text;
+  const headLength = Math.max(24, Math.floor(maxLength * 0.68));
+  const tailLength = Math.max(12, maxLength - headLength - 1);
+  return text.slice(0, headLength).trimEnd() + "…" + text.slice(-tailLength).trimStart();
+}
+
 function buildStoryImagePrompt() {
   if (!character) {
-    $("imagePrompt").value = $("imageSceneNotes").value.trim();
+    $("imagePrompt").value = compactImageText($("imageSceneNotes").value, 950);
     $("imageStatus").textContent = "No character profile is saved. Add your own prompt, then generate.";
     return;
   }
-  const recent = messages
+
+  const recentMessages = messages
     .filter((message) => message.role === "user" || message.role === "assistant")
-    .slice(-6)
-    .map((message) => (message.role === "user" ? "User: " : character.name + ": ") + String(message.content || "").slice(-650))
-    .join("\n");
+    .slice(-3);
+  const recentSummary = recentMessages.map((message) => {
+    const speaker = message.role === "user" ? "User" : (character.name || "Character");
+    return speaker + ": " + compactImageText(message.content, 72);
+  }).filter((line) => !line.endsWith(": ")).join(" | ");
+
+  const identity = compactImageText(character.appearance || "Keep a consistent appearance appropriate to the scene.", 250);
+  const sceneNotes = compactImageText($("imageSceneNotes").value, 85);
+  const openingScene = compactImageText(character.scenario || "the established roleplay setting", 150);
   const parts = [
-    "Create one coherent visual scene for an ongoing fictional roleplay. Treat the following as visual reference, not text to print in the image.",
-    "CHARACTER IDENTITY — keep these stable across images:",
-    character.name + ", age " + character.age + ".",
-    "Appearance: " + (character.appearance || "Use a consistent appearance appropriate to the scene."),
-    "PERSONALITY AND WORLD:",
-    character.personality || "Not specified.",
-    character.background || "Not specified.",
-    "STORY SETUP:",
-    character.scenario || "Continue the established roleplay naturally.",
-    "CURRENT SCENE DETAILS:",
-    $("imageSceneNotes").value.trim() || "Infer the current outfit, condition, pose, expression, and location from the latest story events.",
-    "RECENT STORY EVENTS — use these to understand the current moment:",
-    recent || "No conversation yet; depict the opening scenario.",
-    "VISUAL CONTINUITY: Preserve the character's defining facial features, complexion, hairstyle, body type, and other permanent traits. Let clothing, pose, expression, and location reflect the current scene rather than changing the character's identity.",
-    "IMAGE DIRECTION: cinematic, detailed composition, coherent anatomy, natural lighting, expressive but believable body language. Do not include captions, dialogue, lettering, logos, or watermarks."
-  ];
-  $("imagePrompt").value = parts.filter(Boolean).join("\n\n");
-  $("imageStatus").textContent = "Prompt built from the character profile and recent story messages. Review and edit it before generating.";
+    "Cinematic realistic image of " + (character.name || "the character") + ", age " + (character.age || "adult") + ".",
+    "PERMANENT IDENTITY: " + identity + ". Keep facial features, complexion, hairstyle, body shape and proportions consistent.",
+    recentSummary
+      ? "CURRENT SCENE SUMMARY — condensed from the last three chat messages; the newest message overrides older details: " + recentSummary + "."
+      : "CURRENT SCENE: " + openingScene + ".",
+    sceneNotes ? "EXTRA SCENE DIRECTION: " + sceneNotes + "." : "",
+    "TEMPORARY DETAILS come from the current scene: clothing, pose, expression, action and surroundings. Natural anatomy and believable body language. No captions, lettering, logos or watermarks."
+  ].filter(Boolean);
+
+  let prompt = parts.join(" ");
+  if (prompt.length > 950) {
+    const excess = prompt.length - 950;
+    const reducible = [sceneNotes, recentSummary, identity];
+    let remaining = excess;
+    for (const value of reducible) {
+      if (!value || remaining <= 0) continue;
+      const reduction = Math.min(remaining, Math.max(0, value.length - 24));
+      if (!reduction) continue;
+      const shortened = compactImageText(value, value.length - reduction);
+      prompt = prompt.replace(value, shortened);
+      remaining -= reduction;
+    }
+  }
+  $("imagePrompt").value = prompt.slice(0, 950);
+  $("imageStatus").textContent = "Prompt built from permanent character traits and a summary of the last three chat messages. Review and edit it before generating.";
 }
 function imageDimensions(ratio) {
   const sizes = {
