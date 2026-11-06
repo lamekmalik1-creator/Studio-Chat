@@ -202,6 +202,7 @@ async function connectWorker() {
     renderModels(data.default_model || "openrouter/free");
     $("connectionStatus").textContent = "Connected to Studio Chat API. " + modelList.length + " free model options found.";
     setChatStatus("Connected. Choose a free model and start your roleplay.");
+    loadHordeImageModels();
   } catch (error) {
     $("connectionStatus").textContent = error.message;
   }
@@ -370,13 +371,10 @@ $("clearChat").addEventListener("click", () => {
 });
 
 
-// Manual, story-aware Pollinations image generation.
-// The BYOP access token is held in memory only; the public App Key is not a secret.
-const POLLINATIONS_APP_KEY_STORAGE = "studioChat.pollinationsClientId.v1";
+// Manual, story-aware AI Horde image generation.
+// The AI Horde API key stays in the Cloudflare Worker secret.
 const IMAGE_DB_NAME = "studioChatImageLibrary";
 const IMAGE_DB_VERSION = 1;
-let pollinationsAccessToken = null;
-let imageModelCatalog = [];
 let currentGeneratedImageUrl = null;
 
 function getImageDb() {
@@ -431,129 +429,27 @@ async function deleteStoredImage(id) {
 function makeId() {
   return (crypto.randomUUID ? crypto.randomUUID() : "img-" + Date.now() + "-" + Math.random().toString(36).slice(2));
 }
-function randomBase64Url(bytes) {
-  const values = new Uint8Array(bytes);
-  crypto.getRandomValues(values);
-  let binary = "";
-  values.forEach((value) => { binary += String.fromCharCode(value); });
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-async function sha256Base64Url(value) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  let binary = "";
-  new Uint8Array(digest).forEach((byte) => { binary += String.fromCharCode(byte); });
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-function pollinationsRedirectUri() {
-  return location.origin + location.pathname;
-}
 function setImageAuthStatus(message) {
   $("imageAuthStatus").textContent = message;
 }
-async function beginPollinationsConnection() {
-  try {
-    const clientId = $("pollinationsClientId").value.trim();
-    if (clientId && !clientId.startsWith("pk_")) {
-      setImageAuthStatus("The App Key should start with pk_. You can also leave it blank.");
-      return;
-    }
-    if (clientId) localStorage.setItem(POLLINATIONS_APP_KEY_STORAGE, clientId);
-    const verifier = randomBase64Url(32);
-    const challenge = await sha256Base64Url(verifier);
-    const state = randomBase64Url(24);
-    const redirectUri = pollinationsRedirectUri();
-    sessionStorage.setItem("studioChat.pollinationsPkce.v1", JSON.stringify({ verifier, state, redirectUri }));
-    const params = new URLSearchParams({
-      response_type: "code",
-      redirect_uri: redirectUri,
-      scope: "usage",
-      models: "image",
-      budget: "5",
-      expiry: "7",
-      state,
-      code_challenge: challenge,
-      code_challenge_method: "S256"
-    });
-    if (clientId) params.set("client_id", clientId);
-    setImageAuthStatus("Opening Pollinations consent. Review the image permission and spending budget before approving…");
-    location.href = "https://enter.pollinations.ai/authorize?" + params.toString();
-  } catch (error) {
-    setImageAuthStatus("Could not start Pollinations connection: " + error.message);
-  }
-}
-async function handlePollinationsCallback() {
-  const params = new URLSearchParams(location.search);
-  const code = params.get("code");
-  const oauthError = params.get("error");
-  if (!code && !oauthError) return;
-  const saved = sessionStorage.getItem("studioChat.pollinationsPkce.v1");
-  history.replaceState({}, document.title, location.pathname);
-  if (oauthError) {
-    sessionStorage.removeItem("studioChat.pollinationsPkce.v1");
-    setImageAuthStatus("Pollinations authorization was not completed: " + (params.get("error_description") || oauthError));
-    return;
-  }
-  let pkce;
-  try { pkce = saved ? JSON.parse(saved) : null; } catch { pkce = null; }
-  if (!pkce || params.get("state") !== pkce.state) {
-    setImageAuthStatus("The Pollinations sign-in could not be verified. Please connect again.");
-    return;
-  }
-  sessionStorage.removeItem("studioChat.pollinationsPkce.v1");
-  setImageAuthStatus("Finishing secure Pollinations connection…");
-  try {
-    const tokenParams = new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: pkce.redirectUri,
-      code_verifier: pkce.verifier
-    });
-    const clientId = $("pollinationsClientId").value.trim() || localStorage.getItem(POLLINATIONS_APP_KEY_STORAGE) || "";
-    if (clientId) tokenParams.set("client_id", clientId);
-    const response = await fetch("https://enter.pollinations.ai/api/oauth/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: tokenParams
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.access_token) throw new Error(data.error_description || data.error || "Token exchange failed.");
-    pollinationsAccessToken = data.access_token;
-    setImageAuthStatus("Connected. Your authorized image budget is controlled by Pollinations. You can generate when ready.");
-  } catch (error) {
-    setImageAuthStatus("Connection failed: " + error.message + " Please try connecting again.");
-  }
-}
-async function loadPollinationsImageModels() {
+async function loadHordeImageModels() {
   const select = $("imageModelSelect");
   try {
-    const response = await fetch("https://gen.pollinations.ai/image/models");
-    if (!response.ok) throw new Error("Image model catalogue returned HTTP " + response.status);
+    const response = await apiFetch("/api/images/models");
     const data = await response.json();
-    const models = Array.isArray(data) ? data : (data.data || data.models || []);
-    imageModelCatalog = models.filter((model) => model && (model.id || model.model));
+    const models = Array.isArray(data.models) ? data.models : [];
+    if (!models.length) throw new Error("No image models are currently available.");
     select.replaceChildren();
-    const preferred = ["tongyi-mai/z-image-turbo", "black-forest-labs/flux.1-schnell"];
-    imageModelCatalog.sort((a, b) => {
-      const ai = preferred.indexOf(a.id || a.model);
-      const bi = preferred.indexOf(b.id || b.model);
-      return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
-    });
-    for (const model of imageModelCatalog) {
-      const id = model.id || model.model;
+    for (const model of models) {
       const option = document.createElement("option");
-      option.value = id;
-      option.textContent = model.name || model.title || id;
+      option.value = model.name;
+      option.textContent = model.name + (model.count ? " · " + model.count + " workers" : "");
       select.append(option);
     }
-    if (!imageModelCatalog.length) throw new Error("No image models were returned.");
-    select.value = imageModelCatalog.some((model) => (model.id || model.model) === preferred[0]) ? preferred[0] : (imageModelCatalog[0].id || imageModelCatalog[0].model);
+    select.value = models.some((model) => model.name === "stable_diffusion") ? "stable_diffusion" : models[0].name;
+    setImageAuthStatus(data.configured ? ("AI Horde connected through your Cloudflare Worker. " + models.length + " active image models found.") : "Models are listed, but the Worker is missing AI_HORDE_API_KEY. Add the secret in Cloudflare before generating.");
   } catch (error) {
-    select.replaceChildren();
-    const option = document.createElement("option");
-    option.value = "tongyi-mai/z-image-turbo";
-    option.textContent = "Z-Image Turbo (default)";
-    select.append(option);
-    $("imageStatus").textContent = "Could not load the live model list. A default model is available; " + error.message;
+    setImageAuthStatus("AI Horde is not ready yet. Add the AI_HORDE_API_KEY Worker secret, then reconnect. " + error.message);
   }
 }
 function buildStoryImagePrompt() {
@@ -585,7 +481,7 @@ function buildStoryImagePrompt() {
     "IMAGE DIRECTION: cinematic, detailed composition, coherent anatomy, natural lighting, expressive but believable body language. Do not include captions, dialogue, lettering, logos, or watermarks."
   ];
   $("imagePrompt").value = parts.filter(Boolean).join("\n\n");
-  $("imageStatus").textContent = "Prompt built from the character profile and the latest " + Math.min(6, messages.filter((message) => message.role === "user" || message.role === "assistant").length) + " story messages. Review and edit it before generating.";
+  $("imageStatus").textContent = "Prompt built from the character profile and recent story messages. Review and edit it before generating.";
 }
 function imageDimensions(ratio) {
   const sizes = {
@@ -640,8 +536,9 @@ async function renderImageGallery() {
   }
 }
 async function generateStoryImage() {
-  if (!pollinationsAccessToken) {
-    setImageAuthStatus("Connect Pollinations first. Your image-generation permission is not active in this tab.");
+  if (!getApiBase()) {
+    setImageAuthStatus("Connect your Cloudflare Worker in the Chat tab first.");
+    switchPanel("chat");
     return;
   }
   const prompt = $("imagePrompt").value.trim();
@@ -651,38 +548,45 @@ async function generateStoryImage() {
   }
   const button = $("generateImageBtn");
   button.disabled = true;
-  button.textContent = "Generating…";
-  $("imageStatus").textContent = "Sending your prompt to Pollinations. This may take a little while…";
+  button.textContent = "Queuing…";
+  let requestId = null;
   try {
     const [width, height] = imageDimensions($("imageRatioSelect").value);
-    const params = new URLSearchParams({
-      model: $("imageModelSelect").value || "tongyi-mai/z-image-turbo",
-      width: String(width),
-      height: String(height)
+    const submitResponse = await apiFetch("/api/images/submit", {
+      method: "POST",
+      body: JSON.stringify({
+        prompt,
+        model: $("imageModelSelect").value || "stable_diffusion",
+        width,
+        height
+      })
     });
-    const url = "https://gen.pollinations.ai/image/" + encodeURIComponent(prompt) + "?" + params.toString();
-    const response = await fetch(url, { headers: { Authorization: "Bearer " + pollinationsAccessToken } });
-    if (response.status === 401) {
-      pollinationsAccessToken = null;
-      throw new Error("Pollinations authorization expired or was revoked. Connect again.");
+    const submitted = await submitResponse.json();
+    requestId = submitted.id;
+    if (!requestId) throw new Error(submitted.error || "AI Horde did not return a generation ID.");
+    $("imageStatus").textContent = "Queued on AI Horde. Waiting for a volunteer worker…";
+    button.textContent = "Waiting…";
+
+    const startedAt = Date.now();
+    let status = null;
+    while (Date.now() - startedAt < 8 * 60 * 1000) {
+      await new Promise((resolve) => setTimeout(resolve, 3500));
+      const statusResponse = await apiFetch("/api/images/status/" + encodeURIComponent(requestId));
+      status = await statusResponse.json();
+      if (status.done) break;
+      const queue = Number.isFinite(status.queue_position) ? " Queue position: " + status.queue_position + "." : "";
+      const wait = Number.isFinite(status.wait_time) && status.wait_time > 0 ? " Estimated wait: " + Math.ceil(status.wait_time) + "s." : "";
+      $("imageStatus").textContent = "AI Horde is processing your image." + queue + wait;
     }
-    if (response.status === 402) throw new Error("The authorized Pollen budget is empty or too low. Review your Pollinations balance and consent budget.");
-    if (!response.ok) {
-      const detail = await response.text().catch(() => "");
-      throw new Error("Pollinations returned HTTP " + response.status + (detail ? ": " + detail.slice(0, 220) : ""));
-    }
-    const blob = await response.blob();
-    if (!blob.type.startsWith("image/")) throw new Error("Pollinations returned an unexpected file type: " + (blob.type || "unknown"));
+    if (!status?.done) throw new Error("This generation is still queued after 8 minutes. Your request ID is " + requestId + ". You can try again later.");
+    if (status.faulted) throw new Error("AI Horde could not complete this request. Try another model or a simpler prompt.");
+    button.textContent = "Downloading…";
+    $("imageStatus").textContent = "Generation finished. Downloading your image…";
+    const imageResponse = await apiFetch("/api/images/result/" + encodeURIComponent(requestId));
+    const blob = await imageResponse.blob();
+    if (!blob.type.startsWith("image/")) throw new Error("AI Horde returned an unexpected file type: " + (blob.type || "unknown"));
     const id = makeId();
-    const record = {
-      id,
-      blob,
-      prompt,
-      model: $("imageModelSelect").value,
-      width,
-      height,
-      createdAt: Date.now()
-    };
+    const record = { id, blob, prompt, model: $("imageModelSelect").value, width, height, createdAt: Date.now() };
     await saveStoredImage(record);
     if (currentGeneratedImageUrl) URL.revokeObjectURL(currentGeneratedImageUrl);
     currentGeneratedImageUrl = URL.createObjectURL(blob);
@@ -704,27 +608,15 @@ async function generateStoryImage() {
     button.textContent = "Generate image";
   }
 }
-$("savePollinationsClientId").addEventListener("click", () => {
-  const clientId = $("pollinationsClientId").value.trim();
-  if (clientId && !clientId.startsWith("pk_")) {
-    setImageAuthStatus("The App Key should start with pk_, or leave it blank.");
-    return;
-  }
-  if (clientId) localStorage.setItem(POLLINATIONS_APP_KEY_STORAGE, clientId);
-  else localStorage.removeItem(POLLINATIONS_APP_KEY_STORAGE);
-  setImageAuthStatus(clientId ? "App Key saved on this device. Tap Connect Pollinations to authorize." : "App Key cleared. You can still try connecting without one.");
-});
-$("connectPollinations").addEventListener("click", beginPollinationsConnection);
+$("refreshHordeModels").addEventListener("click", loadHordeImageModels);
 $("buildImagePrompt").addEventListener("click", buildStoryImagePrompt);
 $("generateImageBtn").addEventListener("click", generateStoryImage);
 $("openImageComposer").addEventListener("click", () => {
   switchPanel("image");
   buildStoryImagePrompt();
 });
-$("pollinationsClientId").value = localStorage.getItem(POLLINATIONS_APP_KEY_STORAGE) || "";
-loadPollinationsImageModels();
 renderImageGallery();
-handlePollinationsCallback();
+
 
 if (character) {
   $("charName").value = character.name || "";
