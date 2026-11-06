@@ -270,7 +270,7 @@ export default {
     const url = new URL(request.url);
     try {
       if (request.method === "GET" && url.pathname === "/api/health") {
-        return json(request, env, { ok: true, service: "studio-chat-api", provider: "openrouter", image_provider: "ai-horde" });
+        return json(request, env, { ok: true, service: "studio-chat-api", provider: "openrouter", image_providers: { ai_horde: Boolean(env.AI_HORDE_API_KEY), gemini: Boolean(env.GEMINI_API_KEY) } });
       }
       if (request.method === "GET" && url.pathname === "/api/models") return await handleModels(request, env);
       if (request.method === "POST" && url.pathname === "/api/chat") return await handleChat(request, env);
