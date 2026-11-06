@@ -73,16 +73,11 @@
       <p class="hint">Generate an image only when you choose. Studio Chat can build a starting prompt from your character profile and recent roleplay; you can edit everything before generation.</p>
       <div class="image-auth-card">
         <div class="image-auth-top">
-          <div><strong>Pollinations connection</strong><p>Connect your own Pollinations balance. Your authorization stays in this tab and is not saved in local storage. Create an optional App Key at <a href="https://enter.pollinations.ai/keys" target="_blank" rel="noopener">Pollinations Apps</a>.</p></div>
-          <button id="connectPollinations" class="secondary-btn" type="button">Connect Pollinations</button>
+          <div><strong>AI Horde / Stable Horde</strong><p>Uses volunteer GPU workers. Your registered AI Horde key is stored only as a Cloudflare Worker secret, never in this website or GitHub.</p></div>
+          <button id="refreshHordeModels" class="secondary-btn" type="button">Refresh models</button>
         </div>
-        <label for="pollinationsClientId">Pollinations App Key <span class="optional-label">(optional)</span></label>
-        <div class="connection-row">
-          <input id="pollinationsClientId" type="text" inputmode="text" autocomplete="off" placeholder="pk_... (optional)">
-          <button id="savePollinationsClientId" class="secondary-btn" type="button">Save</button>
-        </div>
-        <p class="status" id="imageAuthStatus" aria-live="polite">Not connected. Connect before generating an image.</p>
-        <p class="privacy-note">Pollinations may use Pollen from the balance you authorize. Review the budget on its consent screen. Studio Chat does not provide unlimited free image generation.</p>
+        <p class="status" id="imageAuthStatus" aria-live="polite">Connect your Cloudflare Worker in the Chat tab. Add your AI Horde key as the AI_HORDE_API_KEY Worker secret.</p>
+        <p class="privacy-note">AI Horde is community-powered and free to use within its queue and Kudos rules. Generation speed depends on available volunteer workers, model availability, and your account priority. Worker operators may be able to see prompts and generated images.</p>
       </div>
       <div class="image-editor">
         <div class="image-editor-heading"><h3>1. Prepare your scene</h3><button id="buildImagePrompt" class="secondary-btn" type="button">↻ Build from story</button></div>
@@ -91,7 +86,7 @@
         <label for="imagePrompt">Image prompt — review and edit before generating</label>
         <textarea id="imagePrompt" rows="10" placeholder="Tap “Build from story” to combine the character profile and recent conversation, or write your own prompt..."></textarea>
         <div class="form-grid image-settings">
-          <div><label for="imageModelSelect">Image model</label><select id="imageModelSelect"><option value="tongyi-mai/z-image-turbo">Loading image models…</option></select></div>
+          <div><label for="imageModelSelect">Image model</label><select id="imageModelSelect"><option value="stable_diffusion">Loading AI Horde models…</option></select></div>
           <div><label for="imageRatioSelect">Image shape</label><select id="imageRatioSelect"><option value="3:4">Portrait · 3:4</option><option value="2:3">Portrait · 2:3</option><option value="1:1">Square · 1:1</option><option value="4:3">Landscape · 4:3</option><option value="16:9">Wide · 16:9</option></select></div>
         </div>
         <button id="generateImageBtn" class="primary" type="button">Generate image</button>
@@ -107,7 +102,7 @@
       </div>
     </section>
     <footer>
-      <p>Studio Chat is an independent project. Text generation is routed through your Cloudflare Worker to OpenRouter. Free model availability and limits are set by the provider.</p>
+      <p>Studio Chat is an independent project. Chat uses OpenRouter through your Cloudflare Worker; images use AI Horde volunteer workers. Availability and queue times depend on the providers.</p>
       <button id="helpInstall" class="text-button">How to install this app</button>
     </footer>
   </main>
