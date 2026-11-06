@@ -233,7 +233,7 @@ async function handleGeminiImage(request, env) {
     body: JSON.stringify({
       model: "gemini-3.1-flash-lite-image",
       input: prompt,
-      response_format: { type: "image", mime_type: "image/png", aspect_ratio: aspectRatio, image_size: "1K" }
+      response_format: { type: "image", mime_type: "image/jpeg", aspect_ratio: aspectRatio, image_size: "1K" }
     })
   });
   const payload = await upstream.json().catch(() => ({}));
@@ -255,8 +255,8 @@ async function handleGeminiImage(request, env) {
   const binary = atob(imageData);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  const candidateMime = imageBlock.mime_type || imageBlock.mimeType || "image/png";
-  const mimeType = /^image\/(png|jpeg|webp)$/.test(candidateMime) ? candidateMime : "image/png";
+  const candidateMime = imageBlock.mime_type || imageBlock.mimeType || "image/jpeg";
+  const mimeType = /^image\/(png|jpeg|webp)$/.test(candidateMime) ? candidateMime : "image/jpeg";
   const headers = new Headers(corsHeaders(request, env));
   headers.set("Content-Type", mimeType);
   headers.set("Cache-Control", "no-store");
