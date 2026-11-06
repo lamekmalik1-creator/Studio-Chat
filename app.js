@@ -447,7 +447,7 @@ async function loadHordeImageModels() {
       select.append(option);
     }
     select.value = models.some((model) => model.name === "stable_diffusion") ? "stable_diffusion" : models[0].name;
-    setImageAuthStatus("AI Horde connected through your Cloudflare Worker. " + models.length + " active image models found.");
+    setImageAuthStatus(data.configured ? ("AI Horde connected through your Cloudflare Worker. " + models.length + " active image models found.") : "Models are listed, but the Worker is missing AI_HORDE_API_KEY. Add the secret in Cloudflare before generating.");
   } catch (error) {
     setImageAuthStatus("AI Horde is not ready yet. Add the AI_HORDE_API_KEY Worker secret, then reconnect. " + error.message);
   }
