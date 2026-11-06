@@ -564,8 +564,8 @@ function buildStoryImagePrompt() {
   }
   const recent = messages
     .filter((message) => message.role === "user" || message.role === "assistant")
-    .slice(-8)
-    .map((message) => (message.role === "user" ? "User: " : character.name + ": ") + message.content)
+    .slice(-6)
+    .map((message) => (message.role === "user" ? "User: " : character.name + ": ") + String(message.content || "").slice(-650))
     .join("\n");
   const parts = [
     "Create one coherent visual scene for an ongoing fictional roleplay. Treat the following as visual reference, not text to print in the image.",
@@ -585,7 +585,7 @@ function buildStoryImagePrompt() {
     "IMAGE DIRECTION: cinematic, detailed composition, coherent anatomy, natural lighting, expressive but believable body language. Do not include captions, dialogue, lettering, logos, or watermarks."
   ];
   $("imagePrompt").value = parts.filter(Boolean).join("\n\n");
-  $("imageStatus").textContent = "Prompt built from the character profile and the latest " + Math.min(8, messages.filter((message) => message.role === "user" || message.role === "assistant").length) + " story messages. Review and edit it before generating.";
+  $("imageStatus").textContent = "Prompt built from the character profile and the latest " + Math.min(6, messages.filter((message) => message.role === "user" || message.role === "assistant").length) + " story messages. Review and edit it before generating.";
 }
 function imageDimensions(ratio) {
   const sizes = {
