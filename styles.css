@@ -62,3 +62,7 @@ dialog{background:#172238;color:var(--text);border:1px solid var(--line);border-
 .model-row select{max-width:100%;flex:1}
 .connection-card .status{line-height:1.5;margin-bottom:0}
 @media(max-width:640px){.connection-row{flex-direction:column}.secondary-btn{padding:12px}.model-row{align-items:stretch;flex-direction:column;gap:7px}}
+
+.resend-btn{display:inline-flex;align-items:center;gap:5px;margin-top:9px;padding:5px 9px;border:1px solid #8b7bd0;background:#211d3c;color:#e4dcff;border-radius:7px;font-size:11px;font-weight:750;cursor:pointer}
+.resend-btn:hover:not(:disabled){background:#302957}
+.resend-btn:disabled{opacity:.6;cursor:wait}

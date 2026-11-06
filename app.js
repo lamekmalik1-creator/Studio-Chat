@@ -77,6 +77,16 @@ function renderMessages() {
     const body = document.createElement("p");
     body.textContent = message.content;
     item.append(label, body);
+    if (message.role === "user" && message.failed) {
+      const resend = document.createElement("button");
+      resend.type = "button";
+      resend.className = "resend-btn";
+      resend.textContent = waiting ? "Retrying…" : "↻ Resend";
+      resend.disabled = waiting;
+      resend.setAttribute("aria-label", "Resend this message");
+      resend.addEventListener("click", () => retryMessage(messages.indexOf(message)));
+      item.append(resend);
+    }
     log.append(item);
   }
   log.scrollTop = log.scrollHeight;
@@ -269,29 +279,72 @@ $("chatForm").addEventListener("submit", async (event) => {
     $("apiBase").focus();
     return;
   }
-  waiting = true;
-  $("sendBtn").disabled = true;
-  $("userMessage").disabled = true;
-  messages.push({ role: "user", content: text });
+  if (messages.some((message) => message.role === "user" && message.failed)) {
+    setChatStatus("Please resend the failed message before sending a new one.");
+    return;
+  }
+  const userMessageIndex = messages.push({ role: "user", content: text, failed: false }) - 1;
   $("userMessage").value = "";
   renderMessages();
   saveConversation();
+  waiting = true;
+  $("sendBtn").disabled = true;
+  $("userMessage").disabled = true;
   setChatStatus("Connecting to OpenRouter…");
   try {
     await streamReply();
-    setChatStatus("Reply received. Continue your roleplay whenever you're ready.");
-  } catch (error) {
-    if (messages.at(-1)?.role === "assistant" && !messages.at(-1).content) messages.pop();
+    messages[userMessageIndex].failed = false;
     saveConversation();
     renderMessages();
-    setChatStatus(error.message + " Your message is still in the conversation; you can retry by sending another message.");
+    setChatStatus("Reply received. Continue your roleplay whenever you're ready.");
+  } catch (error) {
+    if (messages.at(-1)?.role === "assistant") messages.pop();
+    messages[userMessageIndex].failed = true;
+    saveConversation();
+    renderMessages();
+    setChatStatus(error.message + " Tap Resend beneath your message to try again.");
   } finally {
     waiting = false;
     $("sendBtn").disabled = false;
     $("userMessage").disabled = false;
+    renderMessages();
     $("userMessage").focus();
   }
 });
+
+async function retryMessage(messageIndex) {
+  const message = messages[messageIndex];
+  if (!message || message.role !== "user" || !message.failed || waiting) return;
+  if (messageIndex !== messages.length - 1) {
+    setChatStatus("Please retry the most recent failed message first.");
+    return;
+  }
+
+  waiting = true;
+  $("sendBtn").disabled = true;
+  $("userMessage").disabled = true;
+  renderMessages();
+  setChatStatus("Resending your message…");
+  try {
+    await streamReply();
+    message.failed = false;
+    saveConversation();
+    renderMessages();
+    setChatStatus("Reply received. Continue your roleplay whenever you're ready.");
+  } catch (error) {
+    if (messages.at(-1)?.role === "assistant") messages.pop();
+    message.failed = true;
+    saveConversation();
+    renderMessages();
+    setChatStatus(error.message + " Tap Resend beneath your message to try again.");
+  } finally {
+    waiting = false;
+    $("sendBtn").disabled = false;
+    $("userMessage").disabled = false;
+    renderMessages();
+    $("userMessage").focus();
+  }
+}
 
 $("clearChat").addEventListener("click", () => {
   if (!confirm("Clear this character's conversation from this browser?")) return;
