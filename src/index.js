@@ -225,31 +225,37 @@ async function handleGeminiImage(request, env) {
   const aspectRatio = typeof body.aspectRatio === "string" ? body.aspectRatio : "3:4";
   const allowedRatios = new Set(["1:1", "1:4", "4:1", "1:8", "8:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"]);
   if (!allowedRatios.has(aspectRatio)) return json(request, env, errorMessage("Unsupported Gemini image aspect ratio."), 400);
-  const upstream = await fetch("https://generativelanguage.googleapis.com/v1/models/gemini-3.1-flash-lite-image:generateContent", {
+
+  // Use Google's documented Interactions REST API for native image generation.
+  const upstream = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
     body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { responseModalities: ["IMAGE"], responseFormat: { image: { aspectRatio } } }
+      model: "gemini-3.1-flash-lite-image",
+      input: prompt,
+      response_format: { type: "image", mime_type: "image/png", aspect_ratio: aspectRatio, image_size: "1K" }
     })
   });
   const payload = await upstream.json().catch(() => ({}));
   if (!upstream.ok) {
-    const detail = String(payload.error?.message || "Google Gemini returned an unexpected error.").slice(0, 500);
+    const detail = String(payload.error?.message || payload.message || "Google Gemini returned an unexpected error.").slice(0, 500);
     const status = upstream.status === 429 ? 429 : upstream.status === 400 ? 400 : 502;
     return json(request, env, errorMessage("Gemini image generation failed (" + upstream.status + "): " + detail, status), status);
   }
-  const parts = payload.candidates?.[0]?.content?.parts || [];
-  const imagePart = parts.find((part) => part.inlineData?.data || part.inline_data?.data);
-  const imageData = imagePart?.inlineData || imagePart?.inline_data;
-  if (!imageData?.data) {
-    const detail = parts.map((part) => part.text || "").filter(Boolean).join(" ").slice(0, 400);
-    return json(request, env, errorMessage(detail || "Gemini did not return an image. Try adjusting the prompt.", 502), 502);
+
+  // The REST response contains output blocks; support the convenience form too.
+  const outputBlocks = Array.isArray(payload.output) ? payload.output : [];
+  const imageBlock = payload.output_image || outputBlocks.find((item) => item.type === "image" && item.data);
+  const imageData = imageBlock?.data || imageBlock?.image?.data;
+  if (!imageData) {
+    const textOutput = outputBlocks.filter((item) => item.type === "text").map((item) => item.text || "").join(" ").slice(0, 400);
+    return json(request, env, errorMessage(textOutput || "Gemini did not return an image. Try adjusting the prompt.", 502), 502);
   }
-  const binary = atob(imageData.data);
+
+  const binary = atob(imageData);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  const candidateMime = imageData.mimeType || imageData.mime_type || "image/png";
+  const candidateMime = imageBlock.mime_type || imageBlock.mimeType || "image/png";
   const mimeType = /^image\/(png|jpeg|webp)$/.test(candidateMime) ? candidateMime : "image/png";
   const headers = new Headers(corsHeaders(request, env));
   headers.set("Content-Type", mimeType);
