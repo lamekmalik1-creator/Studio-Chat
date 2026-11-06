@@ -158,11 +158,13 @@ function buildSystemPrompt() {
 }
 
 function cleanCharacterReply(raw) {
-  let answer = String(raw || "").trim();
-  answer = answer.replace(/<\/?think>/gi, "");
-  answer = answer.replace(/<\|(?:im_start|im_end|endoftext|assistant|analysis|final)\|>/gi, "");
+  let answer = String(raw || "");
+  // Remove hidden reasoning completely, including unfinished blocks while streaming.
+  answer = answer.replace(/<(think|analysis|reasoning)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)/gi, "");
+  answer = answer.replace(/<\/?(?:think|analysis|reasoning)\b[^>]*>/gi, "");
+  answer = answer.replace(/<\|(?:im_start|im_end|endoftext|assistant|analysis|final|thought)\|>/gi, "");
   answer = answer.replace(/\n\s*(?:#{1,6}\s*)?(?:user|you|human)\s*:[\s\S]*$/i, "");
-  const escapedName = (character?.name || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escapedName = (character?.name || "").replace(/[.*+?^\${}()|[\]\\]/g, "\\$&");
   if (escapedName) answer = answer.replace(new RegExp("^\\s*(?:" + escapedName + "|assistant)\\s*:\\s*", "i"), "");
   return answer.trim();
 }
@@ -238,7 +240,7 @@ async function streamReply() {
       model: $("modelSelect").value || "openrouter/free",
       messages: [{ role: "system", content: buildSystemPrompt() }, ...recent],
       temperature: 0.85,
-      max_tokens: 480
+      max_tokens: 320
     })
   });
   if (!response.body) throw new Error("This browser does not support streamed replies.");
@@ -252,11 +254,15 @@ async function streamReply() {
     if (!line.startsWith("data:")) return;
     const payload = line.slice(5).trim();
     if (!payload || payload === "[DONE]") return;
-    try {
-      const chunk = JSON.parse(payload);
-      const delta = chunk.choices?.[0]?.delta?.content;
-      if (typeof delta === "string" && delta) answer += delta;
-    } catch { /* Ignore non-JSON SSE lines. */ }
+    let chunk;
+    try { chunk = JSON.parse(payload); }
+    catch { return; } // Ignore SSE comments or non-JSON event lines.
+    if (chunk.error) {
+      const detail = typeof chunk.error === "string" ? chunk.error : (chunk.error.message || "The model stream returned an error.");
+      throw new Error(detail);
+    }
+    const delta = chunk.choices?.[0]?.delta?.content;
+    if (typeof delta === "string" && delta) answer += delta;
   }
 
   messages.push({ role: "assistant", content: "" });
